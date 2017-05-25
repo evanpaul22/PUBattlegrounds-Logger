@@ -72,7 +72,7 @@ def test():
 def screenshot_loop(interval=2):
     while True:
         time.sleep(interval - ((time.time() - start) % interval))
-        img = ps.grab(bbox=(0, yoff, width - xoff, height - yoff))
+        img = ps.grab(bbox=(0, y_offset, width - x_offset, height - y_offset))
         txt = image_to_string(img)
         print txt
 
@@ -100,4 +100,4 @@ if __name__ == "__main__":
     start = time.time()
 
     # test()
-    screenshot_loop
+    screenshot_loop()
