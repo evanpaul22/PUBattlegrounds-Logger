@@ -5,3 +5,4 @@ pyparsing==2.2.0
 pyscreenshot==0.4.2
 pytesseract==0.1.6
 six==1.10.0
+virtualenv==15.1.0
