@@ -1,0 +1,17 @@
+TO DO
+-- Overlay GUI
+    -- Subtle/transparent
+    -- Start and stop
+        -- OCR to sync for min plane ride time
+-- Detect similarities
+    -- For names
+    -- For kill feed events (to handle scrolling/fading)
+-- Generate graph
+-- Generate csv
+-- Website
+    -- could just generate the graph on the website...
+    -- Or do both! the web one will look nicer
+
+    -- global data
+    -- your data
+    -- game data (list all uploaded games)
