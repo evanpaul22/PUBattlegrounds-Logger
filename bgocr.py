@@ -7,9 +7,9 @@ from Tkinter import Tk, Label, Button
 import time
 import argparse
 from difflib import SequenceMatcher
-dead_nodes = [] # root nodes
+dead_nodes = []  # root nodes
 kill_nodes = []
-from multiprocessing.dummy import Pool
+import multiprocessing
 
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7):
@@ -18,6 +18,7 @@ def is_similar(a, b, threshold=0.7):
     else:
         return False
 
+# Process feed event
 def process_event(event):
     print event
     e = event.split(" ")
@@ -42,54 +43,75 @@ def process_event(event):
 
         f_event = Player_node(victim, villain, weapon)
 
-
     else:
         print "ERROR"
 
-
+# Scale an image and analyze it
+# This is a balance between performance and accuracy here
 def process_image(im):
-    maxheight = 5000
+    maxheight = 5000 # REVIEW performance#
     h = im.height
-    ratio = maxheight/h
-    img = im.resize((int(im.width*ratio), int(im.height*ratio)), Image.ANTIALIAS)
+    ratio = maxheight / h
+    img = im.resize(
+        (int(im.width * ratio), int(im.height * ratio)), Image.ANTIALIAS)
     txt = image_to_string(img)
 
     return txt
 
+
 def process_images():
-    print "processing", len(IMAGES), "images"
+    if args.verbose:
+        print "processing", len(IMAGES), "images"
     for im in IMAGES:
         process_image(im)
 
-def test():
+# Multithreading test
+def images_test():
     num_im = 20
     images = []
+    # Open test images
     for i in range(1, num_im + 1):
         if i > 9:
             fname = "test_images/Image 0" + str(i) + ".bmp"
         else:
             fname = "test_images/Image 00" + str(i) + ".bmp"
+        if args.verbose:
+            print "Opening", fname
         images.append(Image.open(fname))
-    print "processing"
-    pool = Pool(4)
+    # Get number of cores
+    cores = multiprocessing.cpu_count()
+    if not cores:
+        cores = 2
+    # Assuming hyperthreading is available this should be efficient...
+    threads = cores * 2
+
+    if args.verbose:
+        print "processing", num_im, "images with", threads, "threads"
+
+    pool = multiprocessing.Pool(threads)
     results = pool.map(process_image, images)
     pool.close()
     pool.join()
-    print results
+    # Print results
+    for txt in results:
+        print "==="
+        print txt
 
+# Grab screenshots until run_flag is switched.
+# Note: this only works via multithreading (which Tkinter manages)
 def screenshot_loop(interval=3):
     if run_flag:
+        # TODO hardcode values
         im = ImageGrab.grab(bbox=(0, 725, 550, height - 150))
         IMAGES.append(im)
     root.after(1000, screenshot_loop)
     # time.sleep(interval)
 
-
-
-class MyFirstGUI:
+# GUI
+class LogGUI:
     def __init__(self, master):
         self.master = master
-        master.title("BGOCR")
+        master.title("BGOCRLG")
 
         self.label = Label(master, text="Battlegrounds log grabber")
         self.label.pack()
@@ -100,14 +122,17 @@ class MyFirstGUI:
         self.close_button = Button(master, text="Stop", command=self.stop)
         self.close_button.pack()
 
+        master.after(1000, screenshot_loop)
+        master.mainloop()
+
     def start():
         global run_flag
         run_flag = True
+
     def stop():
         global run_flag
         run_flag = False
         process_images()
-
 
 
 if __name__ == "__main__":
@@ -117,7 +142,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', action="store_true")
     args = parser.parse_args()
-
+    # Open TKinter window
     # root = Tk()
     # # Trick to grab screen dimensions
     # width = root.winfo_screenwidth()
@@ -125,11 +150,8 @@ if __name__ == "__main__":
     # if args.verbose:
     #     print width, height
     #
-    # my_gui = MyFirstGUI(root)
-    # root.after(1000, screenshot_loop)
-    # root.mainloop()
+    # LogGUI(root)
+    #
 
-
-    test()
+    images_test()
     # screenshot_loop()
-    # #im = ps.grab())
