@@ -1,11 +1,15 @@
 #!/usr/bin/python
 from pytesseract import image_to_string
+
+
 from PIL import Image
+from PIL import ImageGrab
 import pyscreenshot as ps
-import Tkinter
+from Tkinter import Tk, Label, Button
 import time
 import argparse
 from difflib import SequenceMatcher
+from pynput import keyboard
 dead_nodes = [] # root nodes
 kill_nodes = []
 
@@ -15,9 +19,7 @@ def is_similar(a, b, threshold=0.7):
         return True
     else:
         return False
-# x1,y1,x2,y2
-# img = ps.grab(bbox=(0,450,700,900))
-# img.show()
+
 def process_event(event):
     print event
     e = event.split(" ")
@@ -48,16 +50,10 @@ def process_event(event):
 
 def test():
     img = Image.open('bg_1920.jpg')
-    # REVIEW See if this super hacky thing works.
     # probably would be better just to hardcode with all resolutions the game offers
-    # unless I can think of something more clever
-    w = float(width/4)
-    h = float(height-height/6)
-    img = img.crop((0, y_offset, w, h))
-    # img.show()
+
     # REVIEW: Messing with this affects quality of OCR. Perhaps filtering or tweaking settings will too
-    maxheight = 5000
-    ratio = maxheight/h
+
 
     img = img.resize((int(img.width*ratio), int(img.height*ratio)), Image.ANTIALIAS)
     # img.show()
@@ -69,21 +65,79 @@ def test():
         process_event(e)
 
 
-def screenshot_loop(interval=2):
-    while True:
-        time.sleep(interval - ((time.time() - start) % interval))
-        img = ps.grab(bbox=(0, y_offset, width - x_offset, height - y_offset))
-        txt = image_to_string(img)
-        print txt
+def screenshot_loop(interval=3):
+    if run_flag:
+        im = ImageGrab.grab(bbox=(0, 725, 550, height - 150))
+        IMAGES.append(im)
+    root.after(1000, screenshot_loop)
+    # time.sleep(interval)
+def process_images():
+        print "processing", len(IMAGES), "images"
+        for im in IMAGES:
+            maxheight = 5000
+            h = im.height
+            ratio = maxheight/h
+            img = im.resize((int(im.width*ratio), int(im.height*ratio)), Image.ANTIALIAS)
+            txt = image_to_string(img)
+            if not txt.replace(" ","").isalnum():
+                print "[ERROR]", txt
+            else:
+                print txt
+
+
+# def on_press(key):
+#     try: k = key.char # single-char keys
+#     except: k = key.name # other keys
+#     if key == keyboard.Key.esc: return False # stop listener
+#     if k == '\\': # keys interested
+#         FLAG = False
+#         print "STOPPING"
+#         process_images()
+
+
+
+
+class MyFirstGUI:
+    def __init__(self, master):
+        self.master = master
+        master.title("A simple GUI")
+
+        self.label = Label(master, text="Battlegrounds log grabber")
+        self.label.pack()
+
+        self.greet_button = Button(master, text="Start", command=start)
+        self.greet_button.pack()
+
+        self.close_button = Button(master, text="Stop", command=stop)
+        self.close_button.pack()
+
+    def greet(self):
+        print("Greetings!")
+
+def start():
+    global run_flag
+    run_flag = True
+def stop():
+    global run_flag
+    run_flag = False
+    process_images()
+
+
 
 if __name__ == "__main__":
+    IMAGES = []
+    run_flag = False
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', action="store_true")
     args = parser.parse_args()
 
-    # Silly but effective way to get screen size
-    root = Tkinter.Tk()
+    # lis = keyboard.Listener(on_press=on_press)
+    # lis.start() # start to listen on a separate thread
+    # lis.join() # no this if main thread is polling self.keys
+
+    # Doesn't work on Windows...
+    root = Tk()
     width = root.winfo_screenwidth()
     height = root.winfo_screenheight()
     root.destroy()
@@ -93,11 +147,12 @@ if __name__ == "__main__":
     if args.verbose:
         print width, height
 
-    #x, y, width, height
-    y_offset = height - (height / 3) + height/25
-    x_offset = width - (width / 7)
+    root = Tk()
+    my_gui = MyFirstGUI(root)
+    root.after(1000, screenshot_loop)
+    root.mainloop()
 
-    start = time.time()
 
     # test()
-    screenshot_loop()
+    # screenshot_loop()
+    # #im = ps.grab())
