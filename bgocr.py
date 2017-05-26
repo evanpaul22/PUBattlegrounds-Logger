@@ -1,7 +1,5 @@
 #!/usr/bin/python
 from pytesseract import image_to_string
-
-
 from PIL import Image
 from PIL import ImageGrab
 import pyscreenshot as ps
@@ -9,9 +7,9 @@ from Tkinter import Tk, Label, Button
 import time
 import argparse
 from difflib import SequenceMatcher
-from pynput import keyboard
 dead_nodes = [] # root nodes
 kill_nodes = []
+from multiprocessing.dummy import Pool
 
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7):
@@ -48,22 +46,36 @@ def process_event(event):
     else:
         print "ERROR"
 
-def test():
-    img = Image.open('bg_1920.jpg')
-    # probably would be better just to hardcode with all resolutions the game offers
 
-    # REVIEW: Messing with this affects quality of OCR. Perhaps filtering or tweaking settings will too
-
-
-    img = img.resize((int(img.width*ratio), int(img.height*ratio)), Image.ANTIALIAS)
-    # img.show()
+def process_image(im):
+    maxheight = 5000
+    h = im.height
+    ratio = maxheight/h
+    img = im.resize((int(im.width*ratio), int(im.height*ratio)), Image.ANTIALIAS)
     txt = image_to_string(img)
 
-    # Process events
-    events = txt.split('\n')
-    for e in events:
-        process_event(e)
+    return txt
 
+def process_images():
+    print "processing", len(IMAGES), "images"
+    for im in IMAGES:
+        process_image(im)
+
+def test():
+    num_im = 20
+    images = []
+    for i in range(1, num_im + 1):
+        if i > 9:
+            fname = "test_images/Image 0" + str(i) + ".bmp"
+        else:
+            fname = "test_images/Image 00" + str(i) + ".bmp"
+        images.append(Image.open(fname))
+    print "processing"
+    pool = Pool(4)
+    results = pool.map(process_image, images)
+    pool.close()
+    pool.join()
+    print results
 
 def screenshot_loop(interval=3):
     if run_flag:
@@ -71,56 +83,30 @@ def screenshot_loop(interval=3):
         IMAGES.append(im)
     root.after(1000, screenshot_loop)
     # time.sleep(interval)
-def process_images():
-        print "processing", len(IMAGES), "images"
-        for im in IMAGES:
-            maxheight = 5000
-            h = im.height
-            ratio = maxheight/h
-            img = im.resize((int(im.width*ratio), int(im.height*ratio)), Image.ANTIALIAS)
-            txt = image_to_string(img)
-            if not txt.replace(" ","").isalnum():
-                print "[ERROR]", txt
-            else:
-                print txt
-
-
-# def on_press(key):
-#     try: k = key.char # single-char keys
-#     except: k = key.name # other keys
-#     if key == keyboard.Key.esc: return False # stop listener
-#     if k == '\\': # keys interested
-#         FLAG = False
-#         print "STOPPING"
-#         process_images()
-
 
 
 
 class MyFirstGUI:
     def __init__(self, master):
         self.master = master
-        master.title("A simple GUI")
+        master.title("BGOCR")
 
         self.label = Label(master, text="Battlegrounds log grabber")
         self.label.pack()
 
-        self.greet_button = Button(master, text="Start", command=start)
+        self.greet_button = Button(master, text="Start", command=self.start)
         self.greet_button.pack()
 
-        self.close_button = Button(master, text="Stop", command=stop)
+        self.close_button = Button(master, text="Stop", command=self.stop)
         self.close_button.pack()
 
-    def greet(self):
-        print("Greetings!")
-
-def start():
-    global run_flag
-    run_flag = True
-def stop():
-    global run_flag
-    run_flag = False
-    process_images()
+    def start():
+        global run_flag
+        run_flag = True
+    def stop():
+        global run_flag
+        run_flag = False
+        process_images()
 
 
 
@@ -132,27 +118,18 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', action="store_true")
     args = parser.parse_args()
 
-    # lis = keyboard.Listener(on_press=on_press)
-    # lis.start() # start to listen on a separate thread
-    # lis.join() # no this if main thread is polling self.keys
-
-    # Doesn't work on Windows...
-    root = Tk()
-    width = root.winfo_screenwidth()
-    height = root.winfo_screenheight()
-    root.destroy()
-    # width = 1920
-    # height = 1080
-
-    if args.verbose:
-        print width, height
-
-    root = Tk()
-    my_gui = MyFirstGUI(root)
-    root.after(1000, screenshot_loop)
-    root.mainloop()
+    # root = Tk()
+    # # Trick to grab screen dimensions
+    # width = root.winfo_screenwidth()
+    # height = root.winfo_screenheight()
+    # if args.verbose:
+    #     print width, height
+    #
+    # my_gui = MyFirstGUI(root)
+    # root.after(1000, screenshot_loop)
+    # root.mainloop()
 
 
-    # test()
+    test()
     # screenshot_loop()
     # #im = ps.grab())
