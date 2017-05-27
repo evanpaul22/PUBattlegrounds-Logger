@@ -19,6 +19,9 @@ TO DO
 
 
 
-We're gonna need a good set of test images
-Maybe stop grabbing the whole log and only grab one or two lines? This may cost us in accuracy
-Multithread the OCR
+Gonna need a good set of test images
+Maybe stop grabbing the whole log and only grab three lines? This may cost  in accuracy
+
+Need knockout images!
+
+Amazon Lambda?

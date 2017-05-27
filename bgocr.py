@@ -1,4 +1,8 @@
-#!/usr/bin/python
+# encoding=utf8
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf8')
 from pytesseract import image_to_string
 from PIL import Image
 from PIL import ImageGrab
@@ -7,9 +11,11 @@ from Tkinter import Tk, Label, Button
 import time
 import argparse
 from difflib import SequenceMatcher
+import multiprocessing
+from unidecode import unidecode
+
 dead_nodes = []  # root nodes
 kill_nodes = []
-import multiprocessing
 
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7):
@@ -45,20 +51,21 @@ def process_event(event):
 
     else:
         print "ERROR"
+# Scale an image
+# REVIEW how this works
+def scale_image(im):
+    factor = 3
+    img = im.resize((int(im.width * factor), int(im.height * factor)), Image.ANTIALIAS)
+    return img
+# Process image into a string via tesseract
+# There is a balance between performance and accuracy here
+def process_image(im, scale=True):
+    if scale:
+        im = scale_image(im)
 
-# Scale an image and analyze it
-# This is a balance between performance and accuracy here
-def process_image(im):
-    maxheight = 5000 # REVIEW performance#
-    h = im.height
-    ratio = maxheight / h
-    img = im.resize(
-        (int(im.width * ratio), int(im.height * ratio)), Image.ANTIALIAS)
-    txt = image_to_string(img)
-
+    txt = image_to_string(im)
     return txt
-
-
+# Procses all images in IMAGES list
 def process_images():
     if args.verbose:
         print "processing", len(IMAGES), "images"
@@ -95,8 +102,23 @@ def images_test():
     # Print results
     for txt in results:
         print "==="
+        txt = txt.split('\n')
+        bad_indices = []
+        # Remove bad indices and attempt to convert unicode to ASCII as best as possible
+        for j in range(len(txt)):
+            if len(txt[j]) < 10:
+                bad_indices.append(j)
+            else:
+                txt[j] = unidecode(u''+txt[j])
+
+        txt = [q for p, q in enumerate(txt) if p not in bad_indices]
         print txt
 
+def scaling_test():
+    im = Image.open("test_images/Image 001.bmp")
+    im.show()
+    im = scale_image(im)
+    im.show()
 # Grab screenshots until run_flag is switched.
 # Note: this only works via multithreading (which Tkinter manages)
 def screenshot_loop(interval=3):
@@ -154,4 +176,4 @@ if __name__ == "__main__":
     #
 
     images_test()
-    # screenshot_loop()
+    # scaling_test()
