@@ -13,75 +13,181 @@ import argparse
 from difflib import SequenceMatcher
 import multiprocessing
 from unidecode import unidecode
+from event import Node
+DEB = "[DEBUG]"
+ERR = "[ERROR]"
+test_set1 = "test_images/set1/"
+test_set2 = "test_images/set2/"
 
 dead_nodes = []  # root nodes
 kill_nodes = []
 
+WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
+           "S12K", "S686", "S1897",
+           "UMP9", "Micro-UZI", "Vector", "Tommy Gun",
+           "AKM", "M16A4", "SCAR-L", "M416",
+           "SKS", "M249",
+           "AWM", "M24", "Kar98k", "VSS",
+           "P1911", "P92", "R1895",
+           "Frag Grenade", "Molotov Cocktail",
+           "Crossbow"]
+
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7):
-    if SequenceMatcher(None, a, b).ratio() >= threshold:
+    rate = SequenceMatcher(None, a, b).ratio()
+    if args.verbose:
+        print a, b, rate
+    if rate >= threshold:
         return True
     else:
         return False
 
+# Attempt to resolve invalid string to a valid string
+def resolve_string(s, target_list, threshold=0.7):
+    results = []
+    s = s.replace("-", " ") # Remove dashes to get rid "players left"
+    s = s.split(" ")[0]
+    # Check string similarity for each possible item
+    for x in target_list:
+        if is_similar(s, x, threshold):
+            results.append(x)
+    if len(results) > 1:
+        print ERR, "More than 1 possible resolution!", s, results
+        return None
+    elif len(results) == 0:
+        print ERR, "No possible resolution:", s
+        return None
+    else:
+        print DEB, "Resolving", s, "to", results[0]
+    return results[0]
+
+## LOG FORMAT CASES ##
+# 1) Knockout
+## VILLAIN knocked out VICTIM with WEAPON
+## VILLAIN knocked out VICTIM by headshot with WEAPON
+# 2) Kill
+## VILLAIN killed VICTIM with WEAPON
+## VILLAIN finally killed VICTIM
+## VILLAIN killed VICTIM by headshot with WEAPON
+## REVIEW ??? finally killed by headshot ???
+# 3) Other
+## VICTIM died outside playzone
+
 # Process feed event
 def process_event(event):
-    print event
     e = event.split(" ")
+    # Knocked out
     if "knocked" in event or "Knocked" in event or "out" in event:
-        villain = e[0]
-        victim = e[3]
-        weapon = e[5]
-        p_node = Player_node(victim, villain, weapon, kill=False)
-
-    # REVIEW How does this behave if you kill someone with a different weapon you downed them with?
-    # Or if someone else kills the downed person. This will be hard to test =/
-    elif "finally" in event:
-        villain = e[0]
-        victim = e[3]
-
-        f_event = Player_node(victim, villain)
-
+        ## VILLAIN knocked out VICTIM by headshot with WEAPON
+        if "by" in event or "headshot" in event:
+            villain = e[0]
+            victim = e[3]
+            weapon = None
+            # Find weapon
+            for k in range(len(k)):
+                if e[k] == "with":
+                    weapon = e[k+1]
+                    break
+            # Can't reliably resolve
+            if not weapon or len(weapon) < 3:
+                print ERR, "Trash string"
+                return None
+            else:
+                weapon = resolve_string(weapon, WEAPONS)
+                return weapon
+        ## VILLAIN knocked out VICTIM with WEAPON
+        else:
+            villain = e[0]
+            victim = e[3]
+            weapon = None
+            for l in range(len(e)):
+                if e[l] == "with":
+                    weapon = e[l+1]
+                    break
+            # Can't reliably resolve
+            if not weapon or len(weapon) < 3:
+                print ERR, "Trash string"
+                return None
+            else:
+                weapon = resolve_string(weapon, WEAPONS)
+                return weapon
+    # Killed
     elif "killed" in event:
-        villain = e[0]
-        victim = e[2]
-        weapon = e[4]
-
-        f_event = Player_node(victim, villain, weapon)
-
+        ## VILLAIN finally killed VICTIM
+        if "finally" in event:
+            villain = e[0]
+            victim = e[3]
+            return None
+            # f_event = Node(victim, villain)
+        ## VILLAIN killed VICTIM by headshot with WEAPON
+        elif "by" in event or "headshot" in event:
+            villain = e[0]
+            victim = e[2]
+            weapon = None
+            # Try to find weapon
+            for i in range(len(e)):
+                if e[i] == "with":
+                    weapon = e[i+1]
+                    break
+            # Can't reliably resolve
+            if not weapon or len(weapon) < 3:
+                print ERR, "Trash string"
+                return None
+            else:
+                weapon = resolve_string(weapon, WEAPONS)
+                return weapon
+        ## VILLAIN killed VICTIM with WEAPON
+        else:
+            villain = e[0]
+            victim = e[2]
+            weapon = None
+            # Try to find weapon
+            for j in range(len(e)):
+                if e[j] == "with":
+                    weapon = e[j+1]
+                    break
+            # Can't reliably resolve
+            if not weapon or len(weapon) < 3:
+                print ERR, "Trash string"
+                return None
+            else:
+                weapon = resolve_string(weapon, WEAPONS)
+                return weapon
+    # Death outside playzone
+    elif "died" in event or "outside" in event:
+        print "died outside playzone"
     else:
-        print "ERROR"
+        print ERR, "Trash string"
 # Scale an image
-# REVIEW how this works
 def scale_image(im):
-    factor = 3
+    factor = 3 # REVIEW There is a balance between performance and accuracy here
     img = im.resize((int(im.width * factor), int(im.height * factor)), Image.ANTIALIAS)
     return img
-# Process image into a string via tesseract
-# There is a balance between performance and accuracy here
+# Process individual mage into a string via tesseract
 def process_image(im, scale=True):
     if scale:
         im = scale_image(im)
 
     txt = image_to_string(im)
     return txt
-# Procses all images in IMAGES list
+
+# Process all images in IMAGES list
 def process_images():
     if args.verbose:
-        print "processing", len(IMAGES), "images"
+        print "Processing", len(IMAGES), "images"
     for im in IMAGES:
         process_image(im)
 
-# Multithreading test
+# Multithreaded imaging test
 def images_test():
     num_im = 20
     images = []
     # Open test images
     for i in range(1, num_im + 1):
         if i > 9:
-            fname = "test_images/Image 0" + str(i) + ".bmp"
+            fname = test_set1 + "Image 0" + str(i) + ".bmp"
         else:
-            fname = "test_images/Image 00" + str(i) + ".bmp"
+            fname = test_set1 + "Image 00" + str(i) + ".bmp"
         if args.verbose:
             print "Opening", fname
         images.append(Image.open(fname))
@@ -94,25 +200,32 @@ def images_test():
 
     if args.verbose:
         print "processing", num_im, "images with", threads, "threads"
-
+    # Parallelize then rejoin
     pool = multiprocessing.Pool(threads)
     results = pool.map(process_image, images)
     pool.close()
     pool.join()
     # Print results
-    for txt in results:
-        print "==="
-        txt = txt.split('\n')
+    feed_results = []
+    # Each event is based on one image
+    for events in results:
+        events = events.split('\n')
         bad_indices = []
-        # Remove bad indices and attempt to convert unicode to ASCII as best as possible
-        for j in range(len(txt)):
-            if len(txt[j]) < 10:
+        # Remove bad indices and coerce to unicode to ASCII as best as possible
+        for j in range(len(events)):
+            if len(events[j]) < 10:
                 bad_indices.append(j)
             else:
-                txt[j] = unidecode(u''+txt[j])
-
-        txt = [q for p, q in enumerate(txt) if p not in bad_indices]
-        print txt
+                events[j] = unidecode(u'' + events[j])
+        # Remove bad events i.e. muddy text that isn't large enough
+        events = [q for p, q in enumerate(events) if p not in bad_indices]
+        # Process each event within the feed photo
+        for event in events:
+            feed_res = process_event(event)
+            # Bad strings are thrown away
+            if feed_res:
+                feed_results.append(feed_res)
+    print feed_results
 
 def scaling_test():
     im = Image.open("test_images/Image 001.bmp")
@@ -121,6 +234,8 @@ def scaling_test():
     im.show()
 # Grab screenshots until run_flag is switched.
 # Note: this only works via multithreading (which Tkinter manages)
+
+
 def screenshot_loop(interval=3):
     if run_flag:
         # TODO hardcode values
