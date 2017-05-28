@@ -36,12 +36,20 @@ WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7):
     rate = SequenceMatcher(None, a, b).ratio()
-    if args.verbose:
-        print a, b, rate
+    # if args.verbose:
+    #     print a, b, rate
     if rate >= threshold:
         return True
     else:
         return False
+
+# TODO Finish implementing this
+def choose_best(s, choices):
+    rates = []
+    for choice in choices:
+        rate = SequenceMatcher(None, s, choice).ratio()
+        rates.append(rate)
+
 
 # Attempt to resolve invalid string to a valid string
 def resolve_string(s, target_list, threshold=0.7):
@@ -53,8 +61,7 @@ def resolve_string(s, target_list, threshold=0.7):
         if is_similar(s, x, threshold):
             results.append(x)
     if len(results) > 1:
-        print ERR, "More than 1 possible resolution!", s, results
-        return None
+        print ERR, "More than 1 possible resolution! (defaulting to first for now)", s, results
     elif len(results) == 0:
         print ERR, "No possible resolution:", s
         return None
@@ -77,6 +84,9 @@ def resolve_string(s, target_list, threshold=0.7):
 # Process feed event
 def process_event(event):
     e = event.split(" ")
+    if len(e) < 3:
+        print ERR, "Trash string"
+        return None
     # Knocked out
     if "knocked" in event or "Knocked" in event or "out" in event:
         ## VILLAIN knocked out VICTIM by headshot with WEAPON
