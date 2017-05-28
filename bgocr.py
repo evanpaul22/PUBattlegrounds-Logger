@@ -17,8 +17,9 @@ from event import Node
 import numpy as np
 DEB = "[DEBUG]"
 ERR = "[ERROR]"
-test_set1 = "test_images/set1/"
-test_set2 = "test_images/set2/"
+im_pre = "test_images/"
+test_set1 = im_pre + "set1/"
+test_set2 = im_pre + "set2/"
 
 dead_nodes = []  # root nodes
 kill_nodes = []
@@ -33,11 +34,13 @@ WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
            "Frag Grenade", "Molotov Cocktail",
            "Crossbow"]
 
+def discard():
+    global DISCARDS
+    DISCARDS += 1
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7):
     rate = SequenceMatcher(None, a, b).ratio()
-    # if args.verbose:
-    #     print a, b, rate
+
     if rate >= threshold:
         return True
     else:
@@ -97,7 +100,7 @@ def process_event(event):
             victim = e[3]
             weapon = None
             # Find weapon
-            for k in range(len(k)):
+            for k in range(len(e)):
                 if e[k] == "with":
                     weapon = e[k+1]
                     break
@@ -189,25 +192,24 @@ def scale_image(im):
 # Process individual mage into a string via tesseract
 def process_image(im):
     # global IMAGE_COUNTER
-    im = Image.fromarray(np.uint8(im))
-    im = scale_image(im)
+    img = Image.fromarray(np.uint8(im[0]))
+    img = scale_image(img)
     # This doesn't work multithreaded??
     # if args.dump:
         # im.save("dump/" + str(IMAGE_COUNTER) + ".bmp")
         # im.show()
         # IMAGE_COUNTER -= 1
-    txt = image_to_string(im)
-    return txt
+    txt = image_to_string(img)
+    return (txt, im[1])
 
 # Process all images in IMAGES list
 def process_images():
     # Get number of cores
-    print "test"
     cores = multiprocessing.cpu_count()
     if not cores:
         cores = 2
     # Assuming hyperthreading is available this should be efficient...
-    threads = cores # * 2
+    threads = cores * 2
 
     print "processing", len(IMAGES), "images with", threads, "threads"
     # Parallelize then rejoin
@@ -220,7 +222,15 @@ def process_images():
     feed_results = []
     # Each event is based on one image
     for events in results:
-        events = events.split('\n')
+        if len(events[0]) == 0:
+            if args.verbose:
+                print ERR, "Trash string"
+            discard()
+            continue
+        t = events[1]
+        print t
+        events = events[0].split('\n')
+
         bad_indices = []
         # Remove bad indices and coerce to unicode to ASCII as best as possible
         for j in range(len(events)):
@@ -235,15 +245,17 @@ def process_images():
             feed_res = process_event(event)
             # Bad strings are thrown away
             if feed_res:
-                feed_results.append(feed_res)
-    print feed_results
-    print "="*50
+                feed_results.append((feed_res, t))
+    for r in feed_results:
+        print r
+        
+    print "=" * 50
     print "Finished gathering data gracefully"
     print "Execution time:", time.time() - START_T
     print "Discarded screenshots:", DISCARDS
     print "Total screenshots:", len(IMAGES)
     print "Ratio:", float(DISCARDS)/float(len(IMAGES))
-    print "="*50
+    print "=" * 50
     root.destroy()
 
 # Multithreaded imaging test
@@ -272,11 +284,10 @@ def screenshot_loop(interval=3):
         screenshot_loop.iterations +=1
         if args.verbose:
             print screenshot_loop.iterations
-        # TODO hardcode resolution box values
-        im = ImageGrab.grab(bbox=(0, 725, 550, height - 150))
+        im = ImageGrab.grab(bbox=DIM)
         I = np.asarray(im)
-        IMAGES.append(I)
-    root.after(interval*1000, screenshot_loop)
+        IMAGES.append((I, time.time() - START_T))
+    root.after(interval * 1000, screenshot_loop)
 screenshot_loop.iterations = 0
 
 # GUI
@@ -309,15 +320,18 @@ class LogGUI:
         IMAGE_COUNTER = len(IMAGES)
         process_images()
 
-def discard():
-    global DISCARDS
-    DISCARDS += 1
+
 if __name__ == "__main__":
     START_T = 0
     DISCARDS = 0
     IMAGES = []
     IMAGE_COUNTER = 0
     run_flag = False
+    # TODO Fill this in for all supported resolutions
+    RES_MAP = {
+                (1920, 1080): (0, 725, 550, 930),
+                (1440, 900): (30, 1200, 850, 1450),
+    }
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', action="store_true")
@@ -328,10 +342,17 @@ if __name__ == "__main__":
     # Trick to grab screen dimensions
     width = root.winfo_screenwidth()
     height = root.winfo_screenheight()
+
+    if not RES_MAP.has_key((width, height)):
+        print "Unsupported resolution, defaulting to 1920x1080"
+        width = 1920
+        height = 1080
+
+    DIM = RES_MAP[(width, height)]
+
     if args.verbose:
         print DEB, "resolution:", width, height
 
     LogGUI(root)
-
     # images_test()
     # scaling_test()
