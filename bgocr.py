@@ -14,6 +14,7 @@ from difflib import SequenceMatcher
 import multiprocessing
 from unidecode import unidecode
 from event import Node
+import numpy as np
 DEB = "[DEBUG]"
 ERR = "[ERROR]"
 test_set1 = "test_images/set1/"
@@ -164,45 +165,32 @@ def scale_image(im):
     img = im.resize((int(im.width * factor), int(im.height * factor)), Image.ANTIALIAS)
     return img
 # Process individual mage into a string via tesseract
-def process_image(im, scale=True):
-    if scale:
-        im = scale_image(im)
-
+def process_image(im):
+    # global IMAGE_COUNTER
+    im = Image.fromarray(np.uint8(im))
+    im = scale_image(im)
+    if args.dump:
+        # im.save("dump/" + str(IMAGE_COUNTER) + ".bmp")
+        im.show()
+        # IMAGE_COUNTER -= 1
     txt = image_to_string(im)
     return txt
 
 # Process all images in IMAGES list
 def process_images():
-    if args.verbose:
-        print "Processing", len(IMAGES), "images"
-    for im in IMAGES:
-        process_image(im)
-
-# Multithreaded imaging test
-def images_test():
-    num_im = 20
-    images = []
-    # Open test images
-    for i in range(1, num_im + 1):
-        if i > 9:
-            fname = test_set1 + "Image 0" + str(i) + ".bmp"
-        else:
-            fname = test_set1 + "Image 00" + str(i) + ".bmp"
-        if args.verbose:
-            print "Opening", fname
-        images.append(Image.open(fname))
     # Get number of cores
+    print "test"
     cores = multiprocessing.cpu_count()
     if not cores:
         cores = 2
     # Assuming hyperthreading is available this should be efficient...
-    threads = cores * 2
+    threads = cores # * 2
 
-    if args.verbose:
-        print "processing", num_im, "images with", threads, "threads"
+    print "processing", len(IMAGES), "images with", threads, "threads"
     # Parallelize then rejoin
     pool = multiprocessing.Pool(threads)
-    results = pool.map(process_image, images)
+
+    results = pool.map(process_image, IMAGES)
     pool.close()
     pool.join()
     # Print results
@@ -226,23 +214,41 @@ def images_test():
             if feed_res:
                 feed_results.append(feed_res)
     print feed_results
+    print DEB, "Finished gracefully"
+    root.destroy()
 
+# Multithreaded imaging test
+def images_test():
+    num_im = 20
+    # Open test images
+    for i in range(1, num_im + 1):
+        if i > 9:
+            fname = test_set1 + "Image 0" + str(i) + ".bmp"
+        else:
+            fname = test_set1 + "Image 00" + str(i) + ".bmp"
+        if args.verbose:
+            print "Opening", fname
+        IMAGES.append(Image.open(fname))
+    process_images()
+# Simple image scaling test
 def scaling_test():
-    im = Image.open("test_images/Image 001.bmp")
+    im = Image.open(test_set1 + "Image 001.bmp")
     im.show()
     im = scale_image(im)
     im.show()
 # Grab screenshots until run_flag is switched.
 # Note: this only works via multithreading (which Tkinter manages)
-
-
 def screenshot_loop(interval=3):
     if run_flag:
-        # TODO hardcode values
+        screenshot_loop.iterations +=1
+        if args.verbose:
+            print screenshot_loop.iterations
+        # TODO hardcode resolution box values
         im = ImageGrab.grab(bbox=(0, 725, 550, height - 150))
-        IMAGES.append(im)
-    root.after(1000, screenshot_loop)
-    # time.sleep(interval)
+        I = np.asarray(im)
+        IMAGES.append(I)
+    root.after(interval*1000, screenshot_loop)
+screenshot_loop.iterations = 0
 
 # GUI
 class LogGUI:
@@ -262,33 +268,35 @@ class LogGUI:
         master.after(1000, screenshot_loop)
         master.mainloop()
 
-    def start():
+    def start(self):
         global run_flag
         run_flag = True
 
-    def stop():
-        global run_flag
+    def stop(self):
+        global run_flag, IMAGE_COUNTER
         run_flag = False
+        IMAGE_COUNTER = len(IMAGES)
         process_images()
 
 
 if __name__ == "__main__":
     IMAGES = []
+    IMAGE_COUNTER = 0
     run_flag = False
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', action="store_true")
+    parser.add_argument('--dump', action="store_true")
     args = parser.parse_args()
     # Open TKinter window
-    # root = Tk()
-    # # Trick to grab screen dimensions
-    # width = root.winfo_screenwidth()
-    # height = root.winfo_screenheight()
-    # if args.verbose:
-    #     print width, height
-    #
-    # LogGUI(root)
-    #
+    root = Tk()
+    # Trick to grab screen dimensions
+    width = root.winfo_screenwidth()
+    height = root.winfo_screenheight()
+    if args.verbose:
+        print DEB, "resolution:", width, height
 
-    images_test()
+    LogGUI(root)
+
+    # images_test()
     # scaling_test()
