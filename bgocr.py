@@ -77,15 +77,17 @@ def resolve_string(s, target_list, threshold=0.7):
 ## VILLAIN killed VICTIM with WEAPON
 ## VILLAIN finally killed VICTIM
 ## VILLAIN killed VICTIM by headshot with WEAPON
-## REVIEW ??? finally killed by headshot ???
 # 3) Other
 ## VICTIM died outside playzone
+## VICTIM died from falling
 
 # Process feed event
 def process_event(event):
     e = event.split(" ")
     if len(e) < 3:
-        print ERR, "Trash string"
+        if args.verbose:
+            print ERR, "Trash string"
+            discard()
         return None
     # Knocked out
     if "knocked" in event or "Knocked" in event or "out" in event:
@@ -101,7 +103,9 @@ def process_event(event):
                     break
             # Can't reliably resolve
             if not weapon or len(weapon) < 3:
-                print ERR, "Trash string"
+                if args.verbose:
+                    print ERR, "Trash string"
+                discard()
                 return None
             else:
                 weapon = resolve_string(weapon, WEAPONS)
@@ -117,7 +121,9 @@ def process_event(event):
                     break
             # Can't reliably resolve
             if not weapon or len(weapon) < 3:
-                print ERR, "Trash string"
+                if args.verbose:
+                    print ERR, "Trash string"
+                discard()
                 return None
             else:
                 weapon = resolve_string(weapon, WEAPONS)
@@ -142,7 +148,9 @@ def process_event(event):
                     break
             # Can't reliably resolve
             if not weapon or len(weapon) < 3:
-                print ERR, "Trash string"
+                if args.verbose:
+                    print ERR, "Trash string"
+                discard()
                 return None
             else:
                 weapon = resolve_string(weapon, WEAPONS)
@@ -159,7 +167,9 @@ def process_event(event):
                     break
             # Can't reliably resolve
             if not weapon or len(weapon) < 3:
-                print ERR, "Trash string"
+                if args.verbose:
+                    print ERR, "Trash string"
+                discard()
                 return None
             else:
                 weapon = resolve_string(weapon, WEAPONS)
@@ -168,7 +178,9 @@ def process_event(event):
     elif "died" in event or "outside" in event:
         print "died outside playzone"
     else:
-        print ERR, "Trash string"
+        if args.verbose:
+            print ERR, "Trash string"
+        discard()
 # Scale an image
 def scale_image(im):
     factor = 3 # REVIEW There is a balance between performance and accuracy here
@@ -225,7 +237,13 @@ def process_images():
             if feed_res:
                 feed_results.append(feed_res)
     print feed_results
-    print DEB, "Finished gracefully"
+    print "="*50
+    print "Finished gathering data gracefully"
+    print "Execution time:", time.time() - START_T
+    print "Discarded screenshots:", DISCARDS
+    print "Total screenshots:", len(IMAGES)
+    print "Ratio:", float(DISCARDS)/float(len(IMAGES))
+    print "="*50
     root.destroy()
 
 # Multithreaded imaging test
@@ -280,7 +298,9 @@ class LogGUI:
         master.mainloop()
 
     def start(self):
-        global run_flag
+        global run_flag, START_T
+        print "Capturing kill feed..."
+        START_T = time.time()
         run_flag = True
 
     def stop(self):
@@ -289,8 +309,12 @@ class LogGUI:
         IMAGE_COUNTER = len(IMAGES)
         process_images()
 
-
+def discard():
+    global DISCARDS
+    DISCARDS += 1
 if __name__ == "__main__":
+    START_T = 0
+    DISCARDS = 0
     IMAGES = []
     IMAGE_COUNTER = 0
     run_flag = False

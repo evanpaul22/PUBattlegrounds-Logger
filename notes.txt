@@ -25,3 +25,6 @@ Maybe stop grabbing the whole log and only grab three lines? This may cost  in a
 Need knockout images!
 
 Amazon Lambda?
+
+Stats module?
+-- Time, length, misses, etc
