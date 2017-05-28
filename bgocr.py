@@ -169,9 +169,10 @@ def process_image(im):
     # global IMAGE_COUNTER
     im = Image.fromarray(np.uint8(im))
     im = scale_image(im)
-    if args.dump:
+    # This doesn't work multithreaded??
+    # if args.dump:
         # im.save("dump/" + str(IMAGE_COUNTER) + ".bmp")
-        im.show()
+        # im.show()
         # IMAGE_COUNTER -= 1
     txt = image_to_string(im)
     return txt
