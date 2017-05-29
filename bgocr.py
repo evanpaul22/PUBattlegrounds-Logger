@@ -57,6 +57,7 @@ def resolve_wep(wep, threshold=0.7):
 def resolve_name(p_name, threshold=0.6, dead=False):
     # Check targetted list for player name
     name = re.sub('[\[\]\.<>?/;:,\"\'\\()+=|~`]', '', p_name)  # Remove dumb characters
+    logging.debug("Before: " + p_name + "; After: " + name)
     # Remove "##*left" string if it exists
     name = re.sub('\w.([0-9])?[0-9](.)?left$', '', name)
     # name = re.sub('(\wkilled$)|(\wwith$)|(\wknocked$)|')
@@ -424,7 +425,7 @@ def screenshot_loop(interval=3):
 
 # Export events to csv
 def export_csv(events):
-    f_name = OUTPUT_NAME + ".csv"
+    f_name = OUT + OUTPUT_NAME + ".csv"
     if len(IMAGES) > 0 and len(events) > 0:
         print "Outputting results to", f_name
         with open(f_name, 'wb') as f:
