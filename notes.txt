@@ -17,3 +17,5 @@ Somewhere discards are being miscounted
 Amazon Lambda for image processing?
 
 Is location detection feasible through map??
+
+Name resolution strategy: shorten string?

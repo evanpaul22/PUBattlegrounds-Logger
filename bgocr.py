@@ -1,14 +1,13 @@
 # encoding=utf8
 import sys
-reload(sys)
-sys.setdefaultencoding('utf8')
+# reload(sys)
+# sys.setdefaultencoding('utf8')
 from pytesseract import image_to_string
 from PIL import Image
 from PIL import ImageGrab
 import pyscreenshot as ps
 from Tkinter import Tk, Label, Button
 import time
-import argparse
 from difflib import SequenceMatcher
 import multiprocessing
 from unidecode import unidecode
@@ -62,10 +61,9 @@ def resolve_wep(wep, threshold=0.7):
 # Attempt to resolve inputted name to existing name
 def resolve_name(p_name, threshold=0.6, dead=False):
     # Check targetted list for player name
-    name = re.sub('[\[\]\.<>?/;:,\"\'\\()+=|~`]', '',
-                  p_name)  # Remove dumb characters
-    # Remove "## left" string if it exists
-    name = re.sub('\w.[0-9]{2}(_)?left$', '', name)
+    name = re.sub('[\[\]\.<>?/;:,\"\'\\()+=|~`]', '', p_name)  # Remove dumb characters
+    # Remove "##*left" string if it exists
+    name = re.sub('\w.([0-9])?[0-9](.)?left$', '', name)
     # name = re.sub('(\wkilled$)|(\wwith$)|(\wknocked$)|')
     if name == "":
         logging.warning("Empty name after filtering original: " + p_name)
@@ -324,17 +322,13 @@ def filter_duplicates(source):
             cache = cache[:len(cache) - 1]
         cache.insert(0, datum)
     return filtered
-
-
 # Scale an image
 def scale_image(im):
     factor = 3  # REVIEW There is a balance between performance and accuracy here
     img = im.resize(
         (int(im.width * factor), int(im.height * factor)), Image.ANTIALIAS)
     return img
-# Process individual mage into a string via tesseract
-
-
+# Process individual image into a string via tesseract
 def process_image(im):
     img = Image.fromarray(np.uint8(im[0]))
     img = scale_image(img)
@@ -342,14 +336,12 @@ def process_image(im):
     return (txt, im[1])
 
 # Process all images in IMAGES list
-
-
 def process_images():
     # Get number of cores
     cores = multiprocessing.cpu_count()
     if not cores:
         cores = 2
-    # Assuming hyperthreading is available this should be efficient...
+    # REVIEW Test performance at different thread counts
     threads = cores * 2
 
     print "Processing", len(IMAGES), "images with", threads, "threads"
@@ -376,7 +368,10 @@ def process_images():
             if len(events[j]) < 10:
                 bad_indices.append(j)
             else:
-                events[j] = unidecode(u'' + events[j])
+                try:
+                    events[j] = unidecode(u'' + events[j])
+                except UnicodeDecodeError:
+                    bad_indices.append(j)
         # Remove bad events i.e. muddy text that isn't large enough
         events = [q for p, q in enumerate(events) if p not in bad_indices]
         # Process each event within the feed photo
@@ -392,7 +387,7 @@ def process_images():
     else:
         root.destroy()
         print "=" * 50
-        print "Finished gathering data gracefully"
+        print "Finished gathering data sucessfully"
         print "Execution time:", time.time() - START_T
         print "Total screenshots:", len(IMAGES)
         unique_events_list = filter_duplicates(feed_results)
@@ -405,8 +400,6 @@ def process_images():
         for ghost in DEAD_PLAYERS:
             logging.debug(ghost)
         return unique_events_list
-
-
 # Multithreaded imaging test
 def images_test():
     num_im = 20
@@ -419,8 +412,6 @@ def images_test():
         IMAGES.append(Image.open(fname))
     process_images()
 # Simple image scaling test
-
-
 def scaling_test():
     im = Image.open(test_set1 + "Image 001.bmp")
     im.show()
@@ -428,8 +419,6 @@ def scaling_test():
     im.show()
 # Grab screenshots until RUN_FLAG is switched.
 # Note: this only works via multithreading (which Tkinter manages)
-
-
 def screenshot_loop(interval=3):
     if RUN_FLAG:
         im = ImageGrab.grab(bbox=DIM)
@@ -440,10 +429,10 @@ def screenshot_loop(interval=3):
         IMAGES.append((I, cur_t))
     root.after(interval * 1000, screenshot_loop)
 
-
+# Export events to csv
 def export_csv(events):
-    f_name = OUTPUT_NAME + ".csv"
-    if len(events) > 0:
+    f_name = OUT + OUTPUT_NAME + ".csv"
+    if len(IMAGES) > 0 and len(events) > 0:
         print "Outputting results to", f_name
         with open(f_name, 'wb') as f:
             w = csv.DictWriter(f, events[0].keys())
@@ -453,23 +442,28 @@ def export_csv(events):
     else:
         print "Nothing to export!"
 
-# TODO: Move this to its own file
+# TODO: Move class to its own file
 # GUI
 class LogGUI:
     def __init__(self, master):
         self.master = master
-        master.title("BGOCRLG")
+        master.title("BG LOGGER")
 
-        self.label = Label(master, text="Battlegrounds log grabber")
-        self.label.pack()
+        self.txt = Label(master, text="Press start on the plane")
+        self.txt.pack()
 
-        self.greet_button = Button(master, text="Start", command=self.start)
+        self.greet_button = Button(master, text="Start capturing", command=self.start)
         self.greet_button.pack()
 
-        self.close_button = Button(master, text="Stop", command=self.stop)
+        self.close_button = Button(master, text="Stop and process", command=self.stop)
         self.close_button.pack()
 
         master.after(1000, screenshot_loop)
+        # Keep window on top
+        master.lift()
+        master.attributes('-topmost',True)
+        master.after_idle(root.attributes,'-topmost',False)
+
         master.mainloop()
 
     def start(self):
@@ -491,6 +485,7 @@ if __name__ == "__main__":
     im_pre = "test_images/"
     OUT = "outputs/"
     LOGS = "logs/"
+    # Make a random file name
     hash = hashlib.sha1()
     hash.update(str(time.time()))
     OUTPUT_NAME = hash.hexdigest()[:10]
