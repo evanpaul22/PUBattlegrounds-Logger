@@ -15,11 +15,13 @@ from unidecode import unidecode
 from event import Node
 import numpy as np
 import re
-
+import hashlib
+import csv
 
 DEB = "[DEBUG]"
 ERR = "[ERROR]"
 im_pre = "test_images/"
+OUT = "outputs"
 test_set1 = im_pre + "set1/"
 test_set2 = im_pre + "set2/"
 
@@ -77,16 +79,20 @@ def resolve_wep(wep, threshold=0.7):
         print ERR, "No possible resolution:", s
         return None
     else:
-        print DEB, "Resolving", s, "to", results[0]
+        if args.verbose:
+            print DEB, "Resolving", s, "to", results[0]
     return results[0]
 
 
-def resolve_name(name, threshold=0.5, dead=False):
+def resolve_name(p_name, threshold=0.5, dead=False):
     # Check targetted list for player name
-    name = re.sub('[\[\]\.<>?/;:\"\'\\()+=|~`]', '', name) # Remove dumb characters
-    name = re.sub('\w.[0-9]{2}(_)?left$') # Remove "## left" string if it exists
+    name = re.sub('[\[\]\.<>?/;:\"\'\\()+=|~`]', '', p_name) # Remove dumb characters
+    name = re.sub('\w.[0-9]{2}(_)?left$', '', name) # Remove "## left" string if it exists
     # name = re.sub('(\wkilled$)|(\wwith$)|(\wknocked$)|')
-
+    if name == "":
+        print ERR, "Empty name after filtering original:", p_name
+        return None
+    # Choose list to alter
     if dead:
         target_list = DEAD_PLAYERS
     else:
@@ -94,25 +100,27 @@ def resolve_name(name, threshold=0.5, dead=False):
     results = []
     # Resolve name
     for x in DEAD_PLAYERS:
-        if is_similar(name, x, threshold, echo=True):
-            results.append(name)
+        if is_similar(name, x, threshold):
+            results.append(x)
     for x in ALIVE_PLAYERS:
-        if is_similar(name, x, threshold, echo=True):
+        if is_similar(name, x, threshold):
             # Player should now be dead
             if dead == True:
                 ALIVE_PLAYERS.remove(x)
 
-            results.append(name)
+            results.append(x)
     # Check results
     if len(results) > 1:
         print ERR, "More than 1 possible name resolution (defaulting to first for now)", name, results
         return results[0]
     elif len(results) == 0:
         print DEB, "No possible name resolution, adding to list", name
+
         target_list.append(name)
         return name
     else:
-        print DEB, "Resolving", name, "to", results[0]
+        if args.verbose:
+            print DEB, "Resolving", name, "to", results[0]
         return results[0]
 
 
@@ -134,7 +142,7 @@ def process_event(event):
     if len(e) < 3:
         if args.verbose:
             print ERR, "Trash string"
-            discard()
+        discard()
         return None
     # Knocked out
     if "knocked" in event or "Knocked" in event or "out" in event:
@@ -175,7 +183,7 @@ def process_event(event):
                 return None
             else:
                 weapon = resolve_wep(weapon)
-                return villain, victim, weapon, e_type
+                return {"villain": villain, "victim": victim, "weapon": weapon, "type": e_type}
         # VILLAIN knocked out VICTIM with WEAPON
         else:
             if len(e) < 6:
@@ -187,7 +195,7 @@ def process_event(event):
             victim = None
             weapon = None
             name_i = 3  # Expected index
-            # Find weapon and victim
+            # Find variables
             for l in range(len(e)):
                 if is_similar(e[l], "knocked"):
                     villain = ''.join(e[:l])
@@ -210,7 +218,7 @@ def process_event(event):
                 return None
             else:
                 weapon = resolve_wep(weapon)
-                return villain, victim, weapon, e_type
+                return {"villain": villain, "victim": victim, "weapon": weapon, "type": e_type}
     # Killed
     elif "killed" in event:
         # VILLAIN finally killed VICTIM
@@ -223,7 +231,7 @@ def process_event(event):
             e_type = "EXECUTION"
             villain = None
             victim = None
-
+            # find variables
             for q in range(len(e)):
                 if is_similar(e[q], "finally"):
                     villain = ''.join(e[:q])
@@ -241,7 +249,7 @@ def process_event(event):
                 discard()
                 return None
             else:
-                return villain, victim, e_type
+                return {"villain": villain, "victim": victim, "weapon": None, "type": e_type}
 
         # VILLAIN killed VICTIM by headshot with WEAPON
         elif "by" in event or "headshot" in event:
@@ -255,7 +263,7 @@ def process_event(event):
             victim = None
             weapon = None
             name_i = 2  # Expected index
-            # Try to find weapon
+            # Find variables
             for i in range(len(e)):
                 if is_similar(e[i], "killed"):
                     name_i = i + 1
@@ -278,7 +286,7 @@ def process_event(event):
                 return None
             else:
                 weapon = resolve_wep(weapon)
-                return villain, victim, weapon, e_type
+                return {"villain": villain, "victim": victim, "weapon": weapon, "type": e_type}
         # VILLAIN killed VICTIM with WEAPON
         else:
             if len(e) < 5:
@@ -291,7 +299,7 @@ def process_event(event):
             victim = None
             weapon = None
             name_i = 2  # Expected index
-            # Try to find variables
+            # Find variables
             for j in range(len(e)):
                 if is_similar(e[j], "killed"):
                     name_i = j + 1
@@ -313,18 +321,47 @@ def process_event(event):
                 return None
             else:
                 weapon = resolve_wep(weapon)
-                return villain, victim, weapon, e_type
+                return {"villain": villain, "victim": victim, "weapon": weapon, "type": e_type}
     # Death outside playzone
     elif "died" in event or "outside" in event:
         print "died outside playzone"
+        return None
     else:
         if args.verbose:
             print ERR, "Trash string"
         discard()
+        return None
 
-# TODO Implement
+# Remove duplicate events
 def filter_duplicates(source):
-    print "filter_duplicates()"
+    cache = []
+    filtered = []
+
+    for datum in source:
+        dup = False
+        for i in range(len(cache)):
+            vic_match = False
+            typ_match = False
+            # if datum["villain"] == cache[i]["villain"]:
+            #     vil_match = True
+            if is_similar(datum["victim"], cache[i]["victim"], threshold=0.6):
+                vic_match = True
+            # if datum["weapon"] == cache[i]["weapon"]:
+            #     wep_match = True
+            if is_similar(datum["type"], cache[i]["type"], threshold=0.6):
+                typ_match = True
+            if vic_match and typ_match:
+                print DEB, "Caught duplicate!", datum, cache[i]
+                dup = True
+                break
+        if not dup:
+            filtered.append(datum)
+        # Pop back of cache and prepend the current datum
+        if len(cache) == 10:
+            cache = cache[:len(cache) - 1]
+        cache.insert(0, datum)
+    return filtered
+
 
 # Scale an image
 def scale_image(im):
@@ -370,7 +407,7 @@ def process_images():
                 print ERR, "Trash string"
             discard()
             continue
-        t = events[1],
+        t = events[1]
 
         events = events[0].split('\n')
 
@@ -388,8 +425,8 @@ def process_images():
             feed_res = process_event(event)
             # Bad strings are thrown away
             if feed_res:
-                data_point = feed_res + t
-                feed_results.append(data_point)
+                feed_res["time"] = t
+                feed_results.append(feed_res)
 
     if len(IMAGES) == 0:
         print ERR, "Please allow program to capture images before stopping!"
@@ -402,10 +439,19 @@ def process_images():
         print "Ratio:", float(DISCARDS) / float(len(IMAGES))
         print "=" * 50
         root.destroy()
-        print filter_duplicates(feed_results)
+        unique_events_list = filter_duplicates(feed_results)
+        print "# of (hopefully) unique events:", len(unique_events_list)
+        print "[EVENTS]"
+        for unique_event in unique_events_list:
+            print unique_event
         print "="*50
-        print "ALIVE:", ALIVE_PLAYERS
-        print "DEAD:", DEAD_PLAYERS
+        print "[ALIVE]"
+        for player in ALIVE_PLAYERS:
+            print player
+        print "[DEAD]"
+        for ghost in DEAD_PLAYERS:
+            print ghost
+        return unique_events_list
 
 
 # Multithreaded imaging test
@@ -445,6 +491,17 @@ def screenshot_loop(interval=3):
     root.after(interval * 1000, screenshot_loop)
 screenshot_loop.iterations = 0
 
+def export_csv(events):
+    hash = hashlib.sha1()
+    hash.update(str(time.time()))
+    f_name = OUT + hash.hexdigest()[:10] + ".csv"
+
+    with open(f_name, 'wb') as f:
+        w = csv.DictWriter(f, events[0].keys())
+        w.writeheader()
+        for e in events:
+            w.writerow(e)
+
 # GUI
 class LogGUI:
     def __init__(self, master):
@@ -473,7 +530,8 @@ class LogGUI:
         global run_flag, IMAGE_COUNTER
         run_flag = False
         IMAGE_COUNTER = len(IMAGES)
-        process_images()
+        events = process_images()
+        export_csv(events)
 
 
 if __name__ == "__main__":

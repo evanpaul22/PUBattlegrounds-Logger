@@ -24,7 +24,8 @@ Somewhere discards are being miscounted
 
 Amazon Lambda?
 
-There
+Is location detection possible??
+
 
 Stats module?
 -- Time, length, misses, etc
