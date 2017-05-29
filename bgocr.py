@@ -451,12 +451,14 @@ def export_csv(events):
     hash = hashlib.sha1()
     hash.update(str(time.time()))
     f_name = OUT + hash.hexdigest()[:10] + ".csv"
-
-    with open(f_name, 'wb') as f:
-        w = csv.DictWriter(f, events[0].keys())
-        w.writeheader()
-        for e in events:
-            w.writerow(e)
+    if len(events) > 0:
+        with open(f_name, 'wb') as f:
+            w = csv.DictWriter(f, events[0].keys())
+            w.writeheader()
+            for e in events:
+                w.writerow(e)
+    else:
+        print "Nothing to export!"
 
 # GUI
 class LogGUI:
