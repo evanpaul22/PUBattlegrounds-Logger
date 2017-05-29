@@ -12,7 +12,6 @@ import argparse
 from difflib import SequenceMatcher
 import multiprocessing
 from unidecode import unidecode
-from event import Node
 import numpy as np
 import re
 import hashlib
