@@ -1,7 +1,7 @@
 # encoding=utf8
 import sys
-# reload(sys)
-# sys.setdefaultencoding('utf8')
+reload(sys)
+sys.setdefaultencoding('utf8')
 from pytesseract import image_to_string
 from PIL import Image
 from PIL import ImageGrab
@@ -16,12 +16,14 @@ import re
 import hashlib
 import csv
 import logging
-# Log Levels
-# debug
-# info
-# warning
-# error
-# critical
+##############
+# Log Levels #
+##############
+# Debug
+# Info
+# Warning
+# Error
+# Critical
 
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7, echo=False):
@@ -32,13 +34,6 @@ def is_similar(a, b, threshold=0.7, echo=False):
         return True
     else:
         return False
-
-# TODO Finish implementing this
-def choose_best(s, choices):
-    rates = []
-    for choice in choices:
-        rate = SequenceMatcher(None, s, choice).ratio()
-        rates.append(rate)
 
 # Attempt to resolve invalid weapon to a valid weapon
 def resolve_wep(wep, threshold=0.7):
@@ -291,8 +286,6 @@ def process_event(event):
         return None
 
 # Remove duplicate events
-
-
 def filter_duplicates(source):
     cache = []
     filtered = []
@@ -431,7 +424,7 @@ def screenshot_loop(interval=3):
 
 # Export events to csv
 def export_csv(events):
-    f_name = OUT + OUTPUT_NAME + ".csv"
+    f_name = OUTPUT_NAME + ".csv"
     if len(IMAGES) > 0 and len(events) > 0:
         print "Outputting results to", f_name
         with open(f_name, 'wb') as f:
