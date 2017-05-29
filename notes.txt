@@ -19,12 +19,12 @@ TO DO
 
 
 
-Gonna need a good set of test images
 Maybe stop grabbing the whole log and only grab three lines? This may cost  in accuracy
-
-Need knockout images!
+Somewhere discards are being miscounted
 
 Amazon Lambda?
+
+There
 
 Stats module?
 -- Time, length, misses, etc
