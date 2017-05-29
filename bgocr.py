@@ -17,30 +17,12 @@ import re
 import hashlib
 import csv
 import logging
-logging.basicConfig(filename='debug.log',level=logging.DEBUG)
 # Log Levels
 # debug
 # info
 # warning
 # error
 # critical
-# Paths
-im_pre = "test_images/"
-OUT = "outputs/"
-test_set1 = im_pre + "set1/"
-test_set2 = im_pre + "set2/"
-# Global lists
-ALIVE_PLAYERS = []
-DEAD_PLAYERS = []
-WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
-           "S12K", "S686", "S1897",
-           "UMP9", "Micro-UZI", "Vector", "Tommy Gun",
-           "AKM", "M16A4", "SCAR-L", "M416",
-           "SKS", "M249",
-           "AWM", "M24", "Kar98k", "VSS",
-           "P1911", "P92", "R1895",
-           "Frag Grenade", "Molotov Cocktail",
-           "Crossbow"]
 
 # Use this for weapons, players, keywords, etc!
 def is_similar(a, b, threshold=0.7, echo=False):
@@ -59,8 +41,7 @@ def choose_best(s, choices):
         rate = SequenceMatcher(None, s, choice).ratio()
         rates.append(rate)
 
-
-# Attempt to resolve invalid string to a valid string
+# Attempt to resolve invalid weapon to a valid weapon
 def resolve_wep(wep, threshold=0.7):
     results = []
     s = wep.replace("-", " ")  # Remove dashes to get rid "players left"
@@ -70,19 +51,21 @@ def resolve_wep(wep, threshold=0.7):
         if is_similar(s, x, threshold):
             results.append(x)
     if len(results) > 1:
-        logging.error("More than 1 possible weapon resolution! (defaulting to first for now): " + s + "," + str(results))
+        logging.error(
+            "More than 1 possible weapon resolution! (defaulting to first for now): " + s + "," + str(results))
     elif len(results) == 0:
         logging.warning("No possible resolution:" + s)
         return None
     else:
-        logging.debug("Resolving " + s + "to" +  results[0])
+        logging.debug("Resolving " + s + " to " + results[0])
     return results[0]
-
-
-def resolve_name(p_name, threshold=0.5, dead=False):
+# Attempt to resolve inputted name to existing name
+def resolve_name(p_name, threshold=0.6, dead=False):
     # Check targetted list for player name
-    name = re.sub('[\[\]\.<>?/;:\"\'\\()+=|~`]', '', p_name) # Remove dumb characters
-    name = re.sub('\w.[0-9]{2}(_)?left$', '', name) # Remove "## left" string if it exists
+    name = re.sub('[\[\]\.<>?/;:,\"\'\\()+=|~`]', '',
+                  p_name)  # Remove dumb characters
+    # Remove "## left" string if it exists
+    name = re.sub('\w.[0-9]{2}(_)?left$', '', name)
     # name = re.sub('(\wkilled$)|(\wwith$)|(\wknocked$)|')
     if name == "":
         logging.warning("Empty name after filtering original: " + p_name)
@@ -106,7 +89,8 @@ def resolve_name(p_name, threshold=0.5, dead=False):
             results.append(x)
     # Check results
     if len(results) > 1:
-        logging.error("More than 1 possible name resolution (defaulting to first for now): " + name + ", "+ str(results))
+        logging.error(
+            "More than 1 possible name resolution (defaulting to first for now): " + name + ", " + str(results))
         return results[0]
     elif len(results) == 0:
         logging.debug("No possible name resolution, adding to list: " + name)
@@ -114,7 +98,7 @@ def resolve_name(p_name, threshold=0.5, dead=False):
         target_list.append(name)
         return name
     else:
-        logging.debug("Resolving " + name +  " to " + results[0])
+        logging.debug("Resolving " + name + " to " + results[0])
         return results[0]
 
 
@@ -309,6 +293,8 @@ def process_event(event):
         return None
 
 # Remove duplicate events
+
+
 def filter_duplicates(source):
     cache = []
     filtered = []
@@ -327,7 +313,8 @@ def filter_duplicates(source):
             if is_similar(datum["type"], cache[i]["type"]):
                 typ_match = True
             if vic_match and typ_match:
-                logging.debug("Caught duplicate: " + str(datum) +" : "+ str(cache[i]))
+                logging.debug("Caught duplicate: " +
+                              str(datum) + " : " + str(cache[i]))
                 dup = True
                 break
         if not dup:
@@ -346,6 +333,8 @@ def scale_image(im):
         (int(im.width * factor), int(im.height * factor)), Image.ANTIALIAS)
     return img
 # Process individual mage into a string via tesseract
+
+
 def process_image(im):
     img = Image.fromarray(np.uint8(im[0]))
     img = scale_image(img)
@@ -353,6 +342,8 @@ def process_image(im):
     return (txt, im[1])
 
 # Process all images in IMAGES list
+
+
 def process_images():
     # Get number of cores
     cores = multiprocessing.cpu_count()
@@ -406,13 +397,13 @@ def process_images():
         print "Total screenshots:", len(IMAGES)
         unique_events_list = filter_duplicates(feed_results)
         print "# of unique events:", len(unique_events_list)
-        print "="*50
+        print "=" * 50
         logging.debug("LIVING PLAYERS:")
         for player in ALIVE_PLAYERS:
-             logging.debug(player)
+            logging.debug(player)
         logging.debug("DEAD PLAYERS:")
         for ghost in DEAD_PLAYERS:
-             logging.debug(ghost)
+            logging.debug(ghost)
         return unique_events_list
 
 
@@ -435,23 +426,25 @@ def scaling_test():
     im.show()
     im = scale_image(im)
     im.show()
-# Grab screenshots until run_flag is switched.
+# Grab screenshots until RUN_FLAG is switched.
 # Note: this only works via multithreading (which Tkinter manages)
+
+
 def screenshot_loop(interval=3):
-    if run_flag:
+    if RUN_FLAG:
         im = ImageGrab.grab(bbox=DIM)
         # Convert to numpy array (to play nice with multithreading?)
         I = np.asarray(im)
         # Truncate to 2 decimal places
-        cur_t = '%.2f'%(time.time() - START_T)
+        cur_t = '%.2f' % (time.time() - START_T)
         IMAGES.append((I, cur_t))
     root.after(interval * 1000, screenshot_loop)
 
+
 def export_csv(events):
-    hash = hashlib.sha1()
-    hash.update(str(time.time()))
-    f_name = OUT + hash.hexdigest()[:10] + ".csv"
+    f_name = OUTPUT_NAME + ".csv"
     if len(events) > 0:
+        print "Outputting results to", f_name
         with open(f_name, 'wb') as f:
             w = csv.DictWriter(f, events[0].keys())
             w.writeheader()
@@ -460,6 +453,7 @@ def export_csv(events):
     else:
         print "Nothing to export!"
 
+# TODO: Move this to its own file
 # GUI
 class LogGUI:
     def __init__(self, master):
@@ -479,24 +473,48 @@ class LogGUI:
         master.mainloop()
 
     def start(self):
-        global run_flag, START_T
+        global RUN_FLAG, START_T
         print "Capturing kill feed..."
         START_T = time.time()
-        run_flag = True
+        RUN_FLAG = True
 
     def stop(self):
-        global run_flag, IMAGE_COUNTER
-        run_flag = False
+        global RUN_FLAG, IMAGE_COUNTER
+        RUN_FLAG = False
         IMAGE_COUNTER = len(IMAGES)
         events = process_images()
         export_csv(events)
 
 
 if __name__ == "__main__":
+    # Paths
+    im_pre = "test_images/"
+    OUT = "outputs/"
+    LOGS = "logs/"
+    hash = hashlib.sha1()
+    hash.update(str(time.time()))
+    OUTPUT_NAME = hash.hexdigest()[:10]
+    test_set1 = im_pre + "set1/"
+    test_set2 = im_pre + "set2/"
+
+    logging.basicConfig(filename=LOGS + OUTPUT_NAME + '.log', level=logging.DEBUG)
+
+    # Global lists
+    ALIVE_PLAYERS = []
+    DEAD_PLAYERS = []
+    WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
+               "S12K", "S686", "S1897",
+               "UMP9", "Micro-UZI", "Vector", "Tommy Gun",
+               "AKM", "M16A4", "SCAR-L", "M416",
+               "SKS", "M249",
+               "AWM", "M24", "Kar98k", "VSS",
+               "P1911", "P92", "R1895",
+               "Frag Grenade", "Molotov Cocktail",
+               "Crossbow"]
     START_T = 0
     IMAGES = []
     IMAGE_COUNTER = 0
-    run_flag = False
+    RUN_FLAG = False
     # TODO Fill this in for all supported resolutions
     RES_MAP = {
         (1920, 1080): (0, 725, 550, 930),
@@ -519,5 +537,3 @@ if __name__ == "__main__":
     print "Resolution:", width, height
 
     LogGUI(root)
-    # images_test()
-    # scaling_test()
