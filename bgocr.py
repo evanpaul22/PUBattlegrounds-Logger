@@ -17,17 +17,22 @@ import numpy as np
 import re
 import hashlib
 import csv
-
-DEB = "[DEBUG]"
-ERR = "[ERROR]"
+import logging
+logging.basicConfig(filename='debug.log',level=logging.DEBUG)
+# Log Levels
+# debug
+# info
+# warning
+# error
+# critical
+# Paths
 im_pre = "test_images/"
-OUT = "outputs"
+OUT = "outputs/"
 test_set1 = im_pre + "set1/"
 test_set2 = im_pre + "set2/"
-
+# Global lists
 ALIVE_PLAYERS = []
 DEAD_PLAYERS = []
-
 WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
            "S12K", "S686", "S1897",
            "UMP9", "Micro-UZI", "Vector", "Tommy Gun",
@@ -38,13 +43,7 @@ WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
            "Frag Grenade", "Molotov Cocktail",
            "Crossbow"]
 
-
-def discard():
-    global DISCARDS
-    DISCARDS += 1
 # Use this for weapons, players, keywords, etc!
-
-
 def is_similar(a, b, threshold=0.7, echo=False):
     rate = SequenceMatcher(None, a, b).ratio()
     if echo:
@@ -55,8 +54,6 @@ def is_similar(a, b, threshold=0.7, echo=False):
         return False
 
 # TODO Finish implementing this
-
-
 def choose_best(s, choices):
     rates = []
     for choice in choices:
@@ -74,13 +71,12 @@ def resolve_wep(wep, threshold=0.7):
         if is_similar(s, x, threshold):
             results.append(x)
     if len(results) > 1:
-        print ERR, "More than 1 possible weapon resolution! (defaulting to first for now)", s, results
+        logging.error("More than 1 possible weapon resolution! (defaulting to first for now): " + s + "," + str(results))
     elif len(results) == 0:
-        print ERR, "No possible resolution:", s
+        logging.warning("No possible resolution:" + s)
         return None
     else:
-        if args.verbose:
-            print DEB, "Resolving", s, "to", results[0]
+        logging.debug("Resolving " + s + "to" +  results[0])
     return results[0]
 
 
@@ -90,7 +86,7 @@ def resolve_name(p_name, threshold=0.5, dead=False):
     name = re.sub('\w.[0-9]{2}(_)?left$', '', name) # Remove "## left" string if it exists
     # name = re.sub('(\wkilled$)|(\wwith$)|(\wknocked$)|')
     if name == "":
-        print ERR, "Empty name after filtering original:", p_name
+        logging.warning("Empty name after filtering original: " + p_name)
         return None
     # Choose list to alter
     if dead:
@@ -111,16 +107,15 @@ def resolve_name(p_name, threshold=0.5, dead=False):
             results.append(x)
     # Check results
     if len(results) > 1:
-        print ERR, "More than 1 possible name resolution (defaulting to first for now)", name, results
+        logging.error("More than 1 possible name resolution (defaulting to first for now): " + name + ", "+ str(results))
         return results[0]
     elif len(results) == 0:
-        print DEB, "No possible name resolution, adding to list", name
+        logging.debug("No possible name resolution, adding to list: " + name)
 
         target_list.append(name)
         return name
     else:
-        if args.verbose:
-            print DEB, "Resolving", name, "to", results[0]
+        logging.debug("Resolving " + name +  " to " + results[0])
         return results[0]
 
 
@@ -140,9 +135,7 @@ def resolve_name(p_name, threshold=0.5, dead=False):
 def process_event(event):
     e = event.split(" ")
     if len(e) < 3:
-        if args.verbose:
-            print ERR, "Trash string"
-        discard()
+        logging.warning("Trash string")
         return None
     # Knocked out
     if "knocked" in event or "Knocked" in event or "out" in event:
@@ -150,8 +143,7 @@ def process_event(event):
         e_type = "KO"
         if "by" in event or "headshot" in event:
             if len(e) < 8:
-                print ERR, "Malformed!", e
-                discard()
+                logging.warning("Malformed: " + str(e))
                 return None
             weapon = None
             villain = None
@@ -172,14 +164,12 @@ def process_event(event):
                     try:
                         weapon = e[k + 1]
                     except IndexError:
-                        print ERR, "IndexError:", e
+                        logging.error("IndexError: " + str(e))
                     break
 
             # Can't reliably resolve
             if not weapon or not villain or not victim or len(weapon) < 3:
-                if args.verbose:
-                    print ERR, "Trash string"
-                discard()
+                logging.warning("Trash string")
                 return None
             else:
                 weapon = resolve_wep(weapon)
@@ -187,8 +177,7 @@ def process_event(event):
         # VILLAIN knocked out VICTIM with WEAPON
         else:
             if len(e) < 6:
-                print ERR, "Malformed!", e
-                discard()
+                logging.warning("Malformed: " + str(e))
                 return None
 
             villain = None
@@ -208,13 +197,11 @@ def process_event(event):
                     try:
                         weapon = e[l + 1]
                     except IndexError:
-                        print ERR, "IndexError:", e
+                        logging.error("IndexError: " + str(e))
                     break
             # Can't reliably resolve
             if not weapon or not victim or not villain or len(weapon) < 3:
-                if args.verbose:
-                    print ERR, "Trash string"
-                discard()
+                logging.warning("Trash string")
                 return None
             else:
                 weapon = resolve_wep(weapon)
@@ -224,8 +211,7 @@ def process_event(event):
         # VILLAIN finally killed VICTIM
         if "finally" in event:
             if len(e) < 4:
-                print ERR, "Malformed!", e
-                discard()
+                logging.warning("Malformed: " + str(e))
                 return None
 
             e_type = "EXECUTION"
@@ -241,12 +227,10 @@ def process_event(event):
                         victim = e[q + 1]
                         victim = resolve_name(victim, dead=True)
                     except IndexError:
-                        print ERR, "IndexError:", e
+                        logging.error("IndexError: " + str(e))
             # Can't reliably resolve
             if not victim or not villain:
-                if args.verbose:
-                    print ERR, "Trash string"
-                discard()
+                logging.warning("Trash string")
                 return None
             else:
                 return {"villain": villain, "victim": victim, "weapon": None, "type": e_type}
@@ -254,8 +238,7 @@ def process_event(event):
         # VILLAIN killed VICTIM by headshot with WEAPON
         elif "by" in event or "headshot" in event:
             if len(e) < 7:
-                print ERR, "Malformed!", e
-                discard()
+                logging.warning("Malformed: " + str(e))
                 return None
 
             e_type = "KILL"
@@ -276,13 +259,11 @@ def process_event(event):
                     try:
                         weapon = e[i + 1]
                     except IndexError:
-                        print ERR, "IndexError", e
+                        logging.error("IndexError: " + str(e))
                     break
             # Can't reliably resolve
             if not villain or not victim or not weapon or len(weapon) < 3:
-                if args.verbose:
-                    print ERR, "Trash string"
-                discard()
+                logging.warning("Trash string")
                 return None
             else:
                 weapon = resolve_wep(weapon)
@@ -290,8 +271,7 @@ def process_event(event):
         # VILLAIN killed VICTIM with WEAPON
         else:
             if len(e) < 5:
-                print ERR, "Malformed!", e
-                discard()
+                logging.warning("Malformed: " + str(e))
                 return None
 
             e_type = "KILL"
@@ -311,25 +291,22 @@ def process_event(event):
                     try:
                         weapon = e[j + 1]
                     except IndexError:
-                        print ERR, "IndexError", e
+                        logging.error("IndexError: " + str(e))
                     break
             # Can't reliably resolve
             if not victim or not villain or not weapon or len(weapon) < 3:
-                if args.verbose:
-                    print ERR, "Trash string"
-                discard()
+                logging.warning("Trash string")
                 return None
             else:
                 weapon = resolve_wep(weapon)
                 return {"villain": villain, "victim": victim, "weapon": weapon, "type": e_type}
     # Death outside playzone
+    # TODO Do something for this
     elif "died" in event or "outside" in event:
-        print "died outside playzone"
+        # print "died outside playzone"
         return None
     else:
-        if args.verbose:
-            print ERR, "Trash string"
-        discard()
+        logging.warning("Trash string")
         return None
 
 # Remove duplicate events
@@ -344,14 +321,14 @@ def filter_duplicates(source):
             typ_match = False
             # if datum["villain"] == cache[i]["villain"]:
             #     vil_match = True
-            if is_similar(datum["victim"], cache[i]["victim"], threshold=0.6):
+            if is_similar(datum["victim"], cache[i]["victim"]):
                 vic_match = True
             # if datum["weapon"] == cache[i]["weapon"]:
             #     wep_match = True
-            if is_similar(datum["type"], cache[i]["type"], threshold=0.6):
+            if is_similar(datum["type"], cache[i]["type"]):
                 typ_match = True
             if vic_match and typ_match:
-                print DEB, "Caught duplicate!", datum, cache[i]
+                logging.debug("Caught duplicate: " + str(datum) +" : "+ str(cache[i]))
                 dup = True
                 break
         if not dup:
@@ -371,14 +348,8 @@ def scale_image(im):
     return img
 # Process individual mage into a string via tesseract
 def process_image(im):
-    # global IMAGE_COUNTER
     img = Image.fromarray(np.uint8(im[0]))
     img = scale_image(img)
-    # This doesn't work multithreaded??
-    # if args.dump:
-    # im.save("dump/" + str(IMAGE_COUNTER) + ".bmp")
-    # im.show()
-    # IMAGE_COUNTER -= 1
     txt = image_to_string(img)
     return (txt, im[1])
 
@@ -391,21 +362,19 @@ def process_images():
     # Assuming hyperthreading is available this should be efficient...
     threads = cores * 2
 
-    print "processing", len(IMAGES), "images with", threads, "threads"
+    print "Processing", len(IMAGES), "images with", threads, "threads"
     # Parallelize then rejoin
     pool = multiprocessing.Pool(threads)
 
     results = pool.map(process_image, IMAGES)
     pool.close()
     pool.join()
-    # Print results
+
     feed_results = []
     # Each event is based on one image
     for events in results:
         if len(events[0]) == 0:
-            if args.verbose:
-                print ERR, "Trash string"
-            discard()
+            logging.warning("Trash string")
             continue
         t = events[1]
 
@@ -429,28 +398,22 @@ def process_images():
                 feed_results.append(feed_res)
 
     if len(IMAGES) == 0:
-        print ERR, "Please allow program to capture images before stopping!"
+        print "Allow program to capture images before stopping!"
     else:
+        root.destroy()
         print "=" * 50
         print "Finished gathering data gracefully"
         print "Execution time:", time.time() - START_T
-        print "Discarded screenshots:", DISCARDS
         print "Total screenshots:", len(IMAGES)
-        print "Ratio:", float(DISCARDS) / float(len(IMAGES))
-        print "=" * 50
-        root.destroy()
         unique_events_list = filter_duplicates(feed_results)
-        print "# of (hopefully) unique events:", len(unique_events_list)
-        print "[EVENTS]"
-        for unique_event in unique_events_list:
-            print unique_event
+        print "# of unique events:", len(unique_events_list)
         print "="*50
-        print "[ALIVE]"
+        logging.debug("LIVING PLAYERS:")
         for player in ALIVE_PLAYERS:
-            print player
-        print "[DEAD]"
+             logging.debug(player)
+        logging.debug("DEAD PLAYERS:")
         for ghost in DEAD_PLAYERS:
-            print ghost
+             logging.debug(ghost)
         return unique_events_list
 
 
@@ -463,8 +426,6 @@ def images_test():
             fname = test_set1 + "Image 0" + str(i) + ".bmp"
         else:
             fname = test_set1 + "Image 00" + str(i) + ".bmp"
-        if args.verbose:
-            print "Opening", fname
         IMAGES.append(Image.open(fname))
     process_images()
 # Simple image scaling test
@@ -479,9 +440,6 @@ def scaling_test():
 # Note: this only works via multithreading (which Tkinter manages)
 def screenshot_loop(interval=3):
     if run_flag:
-        screenshot_loop.iterations += 1
-        if args.verbose:
-            print screenshot_loop.iterations
         im = ImageGrab.grab(bbox=DIM)
         # Convert to numpy array (to play nice with multithreading?)
         I = np.asarray(im)
@@ -489,7 +447,6 @@ def screenshot_loop(interval=3):
         cur_t = '%.2f'%(time.time() - START_T)
         IMAGES.append((I, cur_t))
     root.after(interval * 1000, screenshot_loop)
-screenshot_loop.iterations = 0
 
 def export_csv(events):
     hash = hashlib.sha1()
@@ -536,7 +493,6 @@ class LogGUI:
 
 if __name__ == "__main__":
     START_T = 0
-    DISCARDS = 0
     IMAGES = []
     IMAGE_COUNTER = 0
     run_flag = False
@@ -545,11 +501,7 @@ if __name__ == "__main__":
         (1920, 1080): (0, 725, 550, 930),
         (1440, 900): (30, 1200, 850, 1450),
     }
-    # Parse arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--verbose', action="store_true")
-    parser.add_argument('--dump', action="store_true")
-    args = parser.parse_args()
+
     # Open TKinter window
     root = Tk()
     # Trick to grab screen dimensions
@@ -563,8 +515,7 @@ if __name__ == "__main__":
 
     DIM = RES_MAP[(width, height)]
 
-    if args.verbose:
-        print DEB, "resolution:", width, height
+    print "Resolution:", width, height
 
     LogGUI(root)
     # images_test()

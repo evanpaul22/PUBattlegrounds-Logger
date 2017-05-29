@@ -1,31 +1,19 @@
 TO DO
--- Overlay GUI
-    -- Subtle/transparent
-    -- Start and stop
-        -- OCR to sync for min plane ride time
--- Detect similarities
-    -- For names
-    -- For kill feed events (to handle scrolling/fading)
 -- Generate graph
 -- Generate csv
+    -- Link KOs to executions and resolve names
 -- Website
     -- could just generate the graph on the website...
     -- Or do both! the web one will look nicer
-
     -- global data
     -- your data
     -- game data (list all uploaded games)
 
 
 
-
-Maybe stop grabbing the whole log and only grab three lines? This may cost  in accuracy
+Maybe stop grabbing the whole log and only grab three lines? This may cost in accuracy
 Somewhere discards are being miscounted
 
-Amazon Lambda?
+Amazon Lambda for image processing?
 
-Is location detection possible??
-
-
-Stats module?
--- Time, length, misses, etc
+Is location detection feasible through map??
