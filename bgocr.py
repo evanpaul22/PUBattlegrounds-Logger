@@ -59,7 +59,7 @@ def resolve_name(p_name, threshold=0.6, dead=False):
     name = re.sub('[\[\]\.<>?/;:,\"\'\\()+=|~`]', '', p_name)  # Remove dumb characters
     logging.debug("Before: " + p_name + "; After: " + name)
     # Remove "##*left" string if it exists
-    name = re.sub('\w.([0-9])?[0-9](.)?left$', '', name)
+    name = re.sub('(-)?([0-9])?[0-9](.)?[Il]eft$', '', name)
     # name = re.sub('(\wkilled$)|(\wwith$)|(\wknocked$)|')
     if name == "":
         logging.warning("Empty name after filtering original: " + p_name)
