@@ -4,4 +4,3 @@ outputs/*
 *.pyc
 .DS_Store
 *.log
-notes.txt
