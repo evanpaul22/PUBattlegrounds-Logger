@@ -1,5 +1,5 @@
 # Battlegrounds Log Grabber
-An hacky screen grabber which (somewhat) parses the Battlegrounds kill feed via OCR.
+A hacky screen grabber which does its best to parse Player Unknown's Battlegrounds kill feed via OCR
 ## Installation
 * Download and install tesseract:
   * https://github.com/tesseract-ocr/tesseract/wiki/Downloads
