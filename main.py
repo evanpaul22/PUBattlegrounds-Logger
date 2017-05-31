@@ -15,12 +15,13 @@ import csv
 import logging
 from unidecode import unidecode
 import BGOCRLG_utils as utils
+import threading
 
 class Session:
     captures = []
     start_t = 0
     active = False
-    game_in_progress = False
+    listen = True
     OUT_PATH = "outputs/"
     LOG_PATH = "logs/"
     counter = 0
@@ -35,7 +36,6 @@ class Session:
 
         self.capture_interval = 2.5 # REVIEW
         self.start_t = time.time()
-        self.active = True
     # Report results f session
     def report(self):
         print "=" * 50
@@ -107,7 +107,9 @@ class Session:
     # Grab screenshots until self.active is switched.
     # Note: this only works via multithreading (which Tkinter manages)
     def screenshot_loop(self):
-        if self.active:
+        while self.active:
+            if self.counter == 0:
+                print "Capturing kill feed!"
             self.counter += 1
             im = ImageGrab.grab(bbox=BBOX["FEED"])
             # Convert to numpy array (to play nice with multithreading?)
@@ -116,27 +118,37 @@ class Session:
             cur_t = '%.2f' % (time.time() - self.start_t)
             self.captures.append((I, cur_t))
 
-            if self.counter % 5 == 0:
-                in_lobby = self.check_for_lobby()
+            # Loop every fixed # of seconds
+            time.sleep(self.capture_interval)
+        print "Kill feed capture complete!"
+    # Checks the state of the session
+    def state_listener():
+        while self.listen:
+            print "..."
+            in_lobby = self.check_for_lobby()
 
-                if not (in_lobby and self.game_in_progress and self.ready):
-                    print "Waiting for lobby..."
-                elif in_lobby and not self.game_in_progress:
-                    print "Ready for a game!"
-                    self.ready = True
-                if self.ready and not in_lobby:
-                    self.game_in_progress = True
-                    self.ready = False
-                    print "Game has begun!"
-                if not in_lobby and self.game_in_progress and not self.ready:
-                    print "Game is still in progress!"
-                if in_lobby and self.game_in_progress:
-                    print "Game has ended!"
-                    self.reset()
+            if not (in_lobby and self.active and self.ready):
+                print "Waiting for lobby..."
+            elif in_lobby and not self.active:
+                print "Ready for a game!"
+                self.ready = True
+            if self.ready and not in_lobby:
+                self.active = True
+                self.ready = False
+                print "Game has begun!"
+            if not in_lobby and self.active and not self.ready:
+                print "Game is still in progress!"
+            if in_lobby and self.active:
+                print "Game has ended!"
+                # "Pause" threads during image processing
+                self.active = False
+                self.listen = False
+                events = self.process_images()
+                self.export_csv(events)
+                self.reset() # This turns listening back on
 
-        # Loop every fixed # of seconds
-        time.sleep(self.capture_interval)
-        # self.root.after(self.capture_interval * 1000, self.screenshot_loop)
+            time.sleep(self.capture_interval * 4)
+        print "Done listening for now!"
     # Export events to csv
     def export_csv(self, events):
         csv_f_name = self.OUT_PATH + self.OUTPUT_NAME + ".csv"
@@ -153,33 +165,14 @@ class Session:
         else:
             print "Nothing to export!"
 
-    def launch_GUI(self):
-        # self.root = root
-        # self.root.title("BG LOGGER")
-        #
-        # self.txt = Label(self.root, text="Press start on the plane")
-        # self.txt.pack()
-        #
-        # self.greet_button = Button(self.root, text="Start capturing", command=self.start)
-        # self.greet_button.pack()
-        #
-        # self.close_button = Button(root, text="Stop and process", command=self.stop)
-        # self.close_button.pack()
-        #
-        # # Keep window on top
-        # self.root.lift()
-        # self.root.attributes('-topmost',True)
-        # self.root.after_idle(root.attributes,'-topmost',False)
-        # self.root.after(1000, self.screenshot_loop())
-        # self.root.mainloop()
-        pass
-
     # Reset variables to prepare for new game
     def reset(self):
         self.counter = 0
         self.captures = []
         self.ready = False
         self.game_in_progress = False
+        self.listen = True
+        self.active = False
         # Make a random file name
         hash = hashlib.sha1()
         hash.update(str(time.time()))
@@ -192,8 +185,10 @@ class Session:
     # Start capturing
     # TODO Make this dynamic so the user only has to press it once! (i.e. 'press this in first lobby; BGOCRLG will detect new games')
     def start(self):
-        print "Capturing kill feed..."
-        self.active = True
+        main = threading.Thread(target=screenshot_loop)
+        listener = threading.Thread(target=state_listener)
+        main.start()
+        listener.start()
 
     def stop(self):
         self.active = False
