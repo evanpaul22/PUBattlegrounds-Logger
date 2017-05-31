@@ -19,4 +19,4 @@ A hacky screen grabber which does its best to parse Player Unknown's Battlegroun
 * Data visualization
   * Web interface
   * Track individual and global statistics
-* Location detectionx
+* Location detection
