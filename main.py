@@ -25,17 +25,17 @@ class Session:
     LOG_PATH = "logs/"
     counter = 0
 
-    def __init__(self, root):
+    def __init__(self):
         # Make a random file name
-        self.root = root
         hash = hashlib.sha1()
         hash.update(str(time.time()))
         self.OUTPUT_NAME = hash.hexdigest()[:10]
 
         logging.basicConfig(filename=self.LOG_PATH + self.OUTPUT_NAME + '.log', level=logging.DEBUG)
 
-        self.capture_interval = 3 # REVIEW
-        self.launch_GUI()
+        self.capture_interval = 2.5 # REVIEW
+        self.start_t = time.time()
+        self.active = True
     # Report results f session
     def report(self):
         print "=" * 50
@@ -117,18 +117,26 @@ class Session:
             self.captures.append((I, cur_t))
 
             if self.counter % 5 == 0:
-                in_lobby = self.check_new_game()
-                if in_lobby and self.game_in_progress:
-                    game_in_progress = False
-                    print "The previous game has ended!"
+                in_lobby = self.check_for_lobby()
+
+                if not (in_lobby and self.game_in_progress and self.ready):
+                    print "Waiting for lobby..."
                 elif in_lobby and not self.game_in_progress:
-                    print "A new game is starting!"
-                elif not in_lobby and self.game_in_progress:
-                    print "The game is being played..."
-                elif not in_lobby and not self.game_in_progress:
-                    print "We are in limbo"
+                    print "Ready for a game!"
+                    self.ready = True
+                if self.ready and not in_lobby:
+                    self.game_in_progress = True
+                    self.ready = False
+                    print "Game has begun!"
+                if not in_lobby and self.game_in_progress and not self.ready:
+                    print "Game is still in progress!"
+                if in_lobby and self.game_in_progress:
+                    print "Game has ended!"
+                    self.reset()
+
         # Loop every fixed # of seconds
-        self.root.after(self.capture_interval * 1000, self.screenshot_loop)
+        time.sleep(self.capture_interval)
+        # self.root.after(self.capture_interval * 1000, self.screenshot_loop)
     # Export events to csv
     def export_csv(self, events):
         csv_f_name = self.OUT_PATH + self.OUTPUT_NAME + ".csv"
@@ -146,28 +154,32 @@ class Session:
             print "Nothing to export!"
 
     def launch_GUI(self):
-        self.root = root
-        self.root.title("BG LOGGER")
+        # self.root = root
+        # self.root.title("BG LOGGER")
+        #
+        # self.txt = Label(self.root, text="Press start on the plane")
+        # self.txt.pack()
+        #
+        # self.greet_button = Button(self.root, text="Start capturing", command=self.start)
+        # self.greet_button.pack()
+        #
+        # self.close_button = Button(root, text="Stop and process", command=self.stop)
+        # self.close_button.pack()
+        #
+        # # Keep window on top
+        # self.root.lift()
+        # self.root.attributes('-topmost',True)
+        # self.root.after_idle(root.attributes,'-topmost',False)
+        # self.root.after(1000, self.screenshot_loop())
+        # self.root.mainloop()
+        pass
 
-        self.txt = Label(self.root, text="Press start on the plane")
-        self.txt.pack()
-
-        self.greet_button = Button(self.root, text="Start capturing", command=self.start)
-        self.greet_button.pack()
-
-        self.close_button = Button(root, text="Stop and process", command=self.stop)
-        self.close_button.pack()
-
-        # Keep window on top
-        self.root.lift()
-        self.root.attributes('-topmost',True)
-        self.root.after_idle(root.attributes,'-topmost',False)
-        self.root.after(1000, self.screenshot_loop())
-        self.root.mainloop()
-
+    # Reset variables to prepare for new game
     def reset(self):
         self.counter = 0
         self.captures = []
+        self.ready = False
+        self.game_in_progress = False
         # Make a random file name
         hash = hashlib.sha1()
         hash.update(str(time.time()))
@@ -181,7 +193,6 @@ class Session:
     # TODO Make this dynamic so the user only has to press it once! (i.e. 'press this in first lobby; BGOCRLG will detect new games')
     def start(self):
         print "Capturing kill feed..."
-        self.start_t = time.time()
         self.active = True
 
     def stop(self):
@@ -205,6 +216,7 @@ if __name__ == "__main__":
     width = root.winfo_screenwidth()
     height = root.winfo_screenheight()
 
+    root.destroy()
     if not RES_MAP.has_key((width, height)):
         print "Unsupported resolution, defaulting to 1920x1080"
         width = 1920
@@ -214,5 +226,5 @@ if __name__ == "__main__":
 
     print "Resolution:", width, height
 
-    Session(root)
+    Session()
     check_new_game()
