@@ -96,9 +96,10 @@ def resolve_wep(wep, threshold=0.7):
 # VILLAIN killed VICTIM with WEAPON
 # VILLAIN finally killed VICTIM
 # VILLAIN killed VICTIM by headshot with WEAPON
-# 3) Other
+# TODO 3) Other
 # VICTIM died outside playzone
 # VICTIM died from falling
+# VILLAIN ran over VICTIM with a vehicle
 
 # Process feed event
 def process_event(event):
@@ -311,7 +312,7 @@ def filter_duplicates(source, cache_size=15):
     return filtered
 # Scale an image
 def scale_image(im):
-    factor = 3  # REVIEW There is a balance between performance and accuracy here
+    factor = 2.5  # REVIEW There is a balance between performance and accuracy here
     img = im.resize(
         (int(im.width * factor), int(im.height * factor)), Image.ANTIALIAS)
     return img

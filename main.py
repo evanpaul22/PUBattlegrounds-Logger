@@ -4,6 +4,7 @@ reload(sys)
 sys.setdefaultencoding('utf8')
 from PIL import Image
 from PIL import ImageGrab
+from pytesseract import image_to_string
 import pyscreenshot as ps
 from Tkinter import Tk, Label, Button
 import time
@@ -19,8 +20,10 @@ class Session:
     captures = []
     start_t = 0
     active = False
+    game_in_progress = False
     OUT_PATH = "outputs/"
     LOG_PATH = "logs/"
+    counter = 0
 
     def __init__(self, root):
         # Make a random file name
@@ -95,17 +98,35 @@ class Session:
             self.num_events = len(unique_events_list)
             self.report()
             return unique_events_list
+    # Detect if the player is in a lobby
+    def check_for_lobby(self):
+        img = ImageGrab.grab(bbox=BBOX["LOBBY"])
+        txt = image_to_string(utils.scale_image(img))
+        a = utils.is_similar(txt, "JOINED")
+        return a
     # Grab screenshots until self.active is switched.
     # Note: this only works via multithreading (which Tkinter manages)
     def screenshot_loop(self):
         if self.active:
-            # REVIEW Make DIM a member?
-            im = ImageGrab.grab(bbox=DIM)
+            self.counter += 1
+            im = ImageGrab.grab(bbox=BBOX["FEED"])
             # Convert to numpy array (to play nice with multithreading?)
             I = np.asarray(im)
             # Truncate to 2 decimal places
             cur_t = '%.2f' % (time.time() - self.start_t)
             self.captures.append((I, cur_t))
+
+            if self.counter % 5 == 0:
+                in_lobby = self.check_new_game()
+                if in_lobby and self.game_in_progress:
+                    game_in_progress = False
+                    print "The previous game has ended!"
+                elif in_lobby and not self.game_in_progress:
+                    print "A new game is starting!"
+                elif not in_lobby and self.game_in_progress:
+                    print "The game is being played..."
+                elif not in_lobby and not self.game_in_progress:
+                    print "We are in limbo"
         # Loop every fixed # of seconds
         self.root.after(self.capture_interval * 1000, self.screenshot_loop)
     # Export events to csv
@@ -145,6 +166,7 @@ class Session:
         self.root.mainloop()
 
     def reset(self):
+        self.counter = 0
         self.captures = []
         # Make a random file name
         hash = hashlib.sha1()
@@ -172,8 +194,9 @@ class Session:
 if __name__ == "__main__":
     # TODO Fill this in for all supported resolutions
     RES_MAP = {
-        (1920, 1080): (0, 725, 550, 930),
-        (1440, 900): (30, 1200, 850, 1450),
+        (1920, 1080): {"FEED": (0, 725, 550, 930), "LOBBY": (1817,30,1890,70)},
+        # This isn't really 1440x900, but based rather on a test video I use when doing dev on my Macbook
+        (1440, 900): {"FEED": (30, 1200, 850, 1450), "LOBBY": (2727,140,2840,200)},
     }
 
     # Open TKinter window
@@ -187,8 +210,9 @@ if __name__ == "__main__":
         width = 1920
         height = 1080
 
-    DIM = RES_MAP[(width, height)]
+    BBOX = RES_MAP[(width, height)]
 
     print "Resolution:", width, height
 
     Session(root)
+    check_new_game()
