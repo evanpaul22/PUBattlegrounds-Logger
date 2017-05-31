@@ -1,31 +1,24 @@
-# encoding=utf8
-import sys
-reload(sys)
-sys.setdefaultencoding('utf8')
-from pytesseract import image_to_string
-from PIL import Image
-from PIL import ImageGrab
-import pyscreenshot as ps
-from Tkinter import Tk, Label, Button
-import time
-from difflib import SequenceMatcher
-import multiprocessing
-from unidecode import unidecode
-import numpy as np
 import re
-import hashlib
-import csv
+from pytesseract import image_to_string
+from difflib import SequenceMatcher
 import logging
-##############
-# Log Levels #
-##############
-# Debug
-# Info
-# Warning
-# Error
-# Critical
+from PIL import Image
+import time
+import numpy as np
 
-# Use this for weapons, players, keywords, etc!
+ALIVE = []
+DEAD = []
+# Global lists
+WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
+           "S12K", "S686", "S1897",
+           "UMP9", "Micro-UZI", "Vector", "Tommy Gun",
+           "AKM", "M16A4", "SCAR-L", "M416",
+           "SKS", "M249",
+           "AWM", "M24", "Kar98k", "VSS",
+           "P1911", "P92", "R1895",
+           "Frag Grenade", "Molotov Cocktail",
+           "Crossbow"]
+# Check if a and b are similar
 def is_similar(a, b, threshold=0.7, echo=False):
     rate = SequenceMatcher(None, a, b).ratio()
     if echo:
@@ -35,24 +28,7 @@ def is_similar(a, b, threshold=0.7, echo=False):
     else:
         return False
 
-# Attempt to resolve invalid weapon to a valid weapon
-def resolve_wep(wep, threshold=0.7):
-    results = []
-    s = wep.replace("-", " ")  # Remove dashes to get rid "players left"
-    s = s.split(" ")[0]
-    # Check string similarity for each possible item
-    for x in WEAPONS:
-        if is_similar(s, x, threshold):
-            results.append(x)
-    if len(results) > 1:
-        logging.error(
-            "More than 1 possible weapon resolution! (defaulting to first for now): " + s + "," + str(results))
-    elif len(results) == 0:
-        logging.warning("No possible resolution:" + s)
-        return None
-    else:
-        logging.debug("Resolving " + s + " to " + results[0])
-    return results[0]
+
 # Attempt to resolve inputted name to existing name
 def resolve_name(p_name, threshold=0.6, dead=False):
     # Check targetted list for player name
@@ -66,19 +42,19 @@ def resolve_name(p_name, threshold=0.6, dead=False):
         return None
     # Choose list to alter
     if dead:
-        target_list = DEAD_PLAYERS
+        target_list = DEAD
     else:
-        target_list = ALIVE_PLAYERS
+        target_list = ALIVE
     results = []
     # Resolve name
-    for x in DEAD_PLAYERS:
+    for x in DEAD:
         if is_similar(name, x, threshold):
             results.append(x)
-    for x in ALIVE_PLAYERS:
+    for x in ALIVE:
         if is_similar(name, x, threshold):
             # Player should now be dead
             if dead == True:
-                ALIVE_PLAYERS.remove(x)
+                ALIVE.remove(x)
 
             results.append(x)
     # Check results
@@ -88,13 +64,29 @@ def resolve_name(p_name, threshold=0.6, dead=False):
         return results[0]
     elif len(results) == 0:
         logging.debug("No possible name resolution, adding to list: " + name)
-
         target_list.append(name)
         return name
     else:
         logging.debug("Resolving " + name + " to " + results[0])
         return results[0]
 
+# Attempt to resolve invalid weapon to a valid weapon
+def resolve_wep(wep, threshold=0.7):
+    results = []
+    s = wep.replace("-", " ")  # Remove dashes to get rid of "players left"
+    s = s.split(" ")[0]
+    # Check string similarity for each possible item
+    for x in WEAPONS:
+        if is_similar(s, x, threshold):
+            results.append(x)
+    if len(results) > 1:
+        logging.error("More than 1 possible weapon resolution! (defaulting to 1st): " + s + "," + str(results))
+    elif len(results) == 0:
+        logging.warning("No possible resolution:" + s)
+        return None
+    else:
+        logging.debug("Resolving " + s + " to " + results[0])
+    return results[0]
 
 ## LOG FORMAT CASES ##
 # 1) Knockout
@@ -280,14 +272,15 @@ def process_event(event):
     # Death outside playzone
     # TODO Do something for this
     elif "died" in event or "outside" in event:
-        # print "died outside playzone"
+        logging.debug("Someone died outside the playzone")
         return None
     else:
         logging.warning("Trash string")
         return None
 
 # Remove duplicate events
-def filter_duplicates(source):
+def filter_duplicates(source, cache_size=15):
+    logging.debug("Filtering duplicates with a cache_size= " + str(cache_size))
     cache = []
     filtered = []
 
@@ -312,7 +305,7 @@ def filter_duplicates(source):
         if not dup:
             filtered.append(datum)
         # Pop back of cache and prepend the current datum
-        if len(cache) == 10:
+        if len(cache) == cache_size:
             cache = cache[:len(cache) - 1]
         cache.insert(0, datum)
     return filtered
@@ -328,201 +321,3 @@ def process_image(im):
     img = scale_image(img)
     txt = image_to_string(img)
     return (txt, im[1])
-
-# Process all images in IMAGES list
-def process_images():
-    # Get number of cores
-    cores = multiprocessing.cpu_count()
-    if not cores:
-        cores = 2
-    # REVIEW Test performance at different thread counts
-    threads = cores * 2
-
-    print "Processing", len(IMAGES), "images with", threads, "threads"
-    # Parallelize then rejoin
-    pool = multiprocessing.Pool(threads)
-
-    results = pool.map(process_image, IMAGES)
-    pool.close()
-    pool.join()
-
-    feed_results = []
-    # Each event is based on one image
-    for events in results:
-        if len(events[0]) == 0:
-            logging.warning("Trash string")
-            continue
-        t = events[1]
-
-        events = events[0].split('\n')
-
-        bad_indices = []
-        # Remove bad indices and coerce to unicode to ASCII as best as possible
-        for j in range(len(events)):
-            if len(events[j]) < 10:
-                bad_indices.append(j)
-            else:
-                try:
-                    events[j] = unidecode(u'' + events[j])
-                except UnicodeDecodeError:
-                    bad_indices.append(j)
-        # Remove bad events i.e. muddy text that isn't large enough
-        events = [q for p, q in enumerate(events) if p not in bad_indices]
-        # Process each event within the feed photo
-        for event in events:
-            feed_res = process_event(event)
-            # Bad strings are thrown away
-            if feed_res:
-                feed_res["time"] = t
-                feed_results.append(feed_res)
-
-    if len(IMAGES) == 0:
-        print "Allow program to capture images before stopping!"
-    else:
-        root.destroy()
-        print "=" * 50
-        print "Finished gathering data sucessfully"
-        print "Execution time:", time.time() - START_T
-        print "Total screenshots:", len(IMAGES)
-        unique_events_list = filter_duplicates(feed_results)
-        print "# of unique events:", len(unique_events_list)
-        print "=" * 50
-        logging.debug("LIVING PLAYERS:")
-        for player in ALIVE_PLAYERS:
-            logging.debug(player)
-        logging.debug("DEAD PLAYERS:")
-        for ghost in DEAD_PLAYERS:
-            logging.debug(ghost)
-        return unique_events_list
-# Multithreaded imaging test
-def images_test():
-    num_im = 20
-    # Open test images
-    for i in range(1, num_im + 1):
-        if i > 9:
-            fname = test_set1 + "Image 0" + str(i) + ".bmp"
-        else:
-            fname = test_set1 + "Image 00" + str(i) + ".bmp"
-        IMAGES.append(Image.open(fname))
-    process_images()
-# Simple image scaling test
-def scaling_test():
-    im = Image.open(test_set1 + "Image 001.bmp")
-    im.show()
-    im = scale_image(im)
-    im.show()
-# Grab screenshots until RUN_FLAG is switched.
-# Note: this only works via multithreading (which Tkinter manages)
-def screenshot_loop(interval=3):
-    if RUN_FLAG:
-        im = ImageGrab.grab(bbox=DIM)
-        # Convert to numpy array (to play nice with multithreading?)
-        I = np.asarray(im)
-        # Truncate to 2 decimal places
-        cur_t = '%.2f' % (time.time() - START_T)
-        IMAGES.append((I, cur_t))
-    root.after(interval * 1000, screenshot_loop)
-
-# Export events to csv
-def export_csv(events):
-    f_name = OUT + OUTPUT_NAME + ".csv"
-    if len(IMAGES) > 0 and len(events) > 0:
-        print "Outputting results to", f_name
-        with open(f_name, 'wb') as f:
-            w = csv.DictWriter(f, events[0].keys())
-            w.writeheader()
-            for e in events:
-                w.writerow(e)
-    else:
-        print "Nothing to export!"
-
-# TODO: Move class to its own file
-# GUI
-class LogGUI:
-    def __init__(self, master):
-        self.master = master
-        master.title("BG LOGGER")
-
-        self.txt = Label(master, text="Press start on the plane")
-        self.txt.pack()
-
-        self.greet_button = Button(master, text="Start capturing", command=self.start)
-        self.greet_button.pack()
-
-        self.close_button = Button(master, text="Stop and process", command=self.stop)
-        self.close_button.pack()
-
-        master.after(1000, screenshot_loop)
-        # Keep window on top
-        master.lift()
-        master.attributes('-topmost',True)
-        master.after_idle(root.attributes,'-topmost',False)
-
-        master.mainloop()
-
-    def start(self):
-        global RUN_FLAG, START_T
-        print "Capturing kill feed..."
-        START_T = time.time()
-        RUN_FLAG = True
-
-    def stop(self):
-        global RUN_FLAG, IMAGE_COUNTER
-        RUN_FLAG = False
-        IMAGE_COUNTER = len(IMAGES)
-        events = process_images()
-        export_csv(events)
-
-
-if __name__ == "__main__":
-    # Paths
-    im_pre = "test_images/"
-    OUT = "outputs/"
-    LOGS = "logs/"
-    # Make a random file name
-    hash = hashlib.sha1()
-    hash.update(str(time.time()))
-    OUTPUT_NAME = hash.hexdigest()[:10]
-    test_set1 = im_pre + "set1/"
-    test_set2 = im_pre + "set2/"
-
-    logging.basicConfig(filename=LOGS + OUTPUT_NAME + '.log', level=logging.DEBUG)
-
-    # Global lists
-    ALIVE_PLAYERS = []
-    DEAD_PLAYERS = []
-    WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
-               "S12K", "S686", "S1897",
-               "UMP9", "Micro-UZI", "Vector", "Tommy Gun",
-               "AKM", "M16A4", "SCAR-L", "M416",
-               "SKS", "M249",
-               "AWM", "M24", "Kar98k", "VSS",
-               "P1911", "P92", "R1895",
-               "Frag Grenade", "Molotov Cocktail",
-               "Crossbow"]
-    START_T = 0
-    IMAGES = []
-    IMAGE_COUNTER = 0
-    RUN_FLAG = False
-    # TODO Fill this in for all supported resolutions
-    RES_MAP = {
-        (1920, 1080): (0, 725, 550, 930),
-        (1440, 900): (30, 1200, 850, 1450),
-    }
-
-    # Open TKinter window
-    root = Tk()
-    # Trick to grab screen dimensions
-    width = root.winfo_screenwidth()
-    height = root.winfo_screenheight()
-
-    if not RES_MAP.has_key((width, height)):
-        print "Unsupported resolution, defaulting to 1920x1080"
-        width = 1920
-        height = 1080
-
-    DIM = RES_MAP[(width, height)]
-
-    print "Resolution:", width, height
-
-    LogGUI(root)
