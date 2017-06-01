@@ -345,21 +345,20 @@ def filter_duplicates(events_list, cache_size=15):
     for event in events_list:
         dup = False
         for i in range(len(event_cache)):
-            vic_match = False
-            typ_match = False
+            vic_match = is_similar(event["victim"], event_cache[i]["victim"])
+            typ_match = is_similar(event["type"], event_cache[i]["type"])
 
-            if is_similar(event["victim"], event_cache[i]["victim"])
-            and is_similar(event["type"], event_cache[i]["type"]):
+            if vic_match and typ_match:
                 logging.debug("Caught duplicate: " +
                               str(event) + " : " + str(event_cache[i]))
                 dup = True
                 break
         if not dup:
-            filtered.append(datum)
-        # Pop back of cache and prepend the current datum
+            filtered.append(event)
+        # Pop back of cache and prepend the current event
         if len(event_cache) == cache_size:
             event_cache = event_cache[:len(event_cache) - 1]
-        event_cache.insert(0, datum)
+        event_cache.insert(0, event)
     return filtered
 
 
