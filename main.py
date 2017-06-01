@@ -267,5 +267,6 @@ if __name__ == "__main__":
             pass
     # Catch CTRL-C and finish processing any images in the buffer
     except KeyboardInterrupt:
+        # REVIEW What happens if I CTRL-C during image processing?
         s.stop_and_process()
         sys.exit()
