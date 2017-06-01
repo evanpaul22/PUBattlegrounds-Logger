@@ -9,7 +9,9 @@ A hacky screen grabber which does its best to parse Player Unknown's Battlegroun
 
 ## Usage guide
 * `python main.py` will begin capturing the session.
-  * For best results: start the program before or during the lobby
+  * For best results: start the program before or during the lobby.
+  * End session with CTRL-C
+  * If you're using a weak computer: try `python main.py --delay-processing` which will process all games at the end of your session.
 * A CSV output file will be written to `outputs/` and debug logs will be written to `logs/`
   * New games will be automatically detected and new log and output files will be saved.
 * When you're finished playing, simply press CTRL-C and any remaining images will be processed.
