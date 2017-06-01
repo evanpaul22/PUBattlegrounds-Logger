@@ -22,9 +22,13 @@ class Session:
     start_t = 0
     active = False
     listen = True
+    ready = False
     OUT_PATH = "outputs/"
     LOG_PATH = "logs/"
     counter = 0
+    # REVIEW parameters
+    capture_interval = 2.5
+    listen_interval = 4
 
     def __init__(self):
         # Make a random file name
@@ -34,7 +38,6 @@ class Session:
 
         logging.basicConfig(filename=self.LOG_PATH + self.OUTPUT_NAME + '.log', level=logging.DEBUG)
 
-        self.capture_interval = 2.5 # REVIEW
         self.start_t = time.time()
     # Report results f session
     def report(self):
@@ -103,52 +106,53 @@ class Session:
         img = ImageGrab.grab(bbox=BBOX["LOBBY"])
         txt = image_to_string(utils.scale_image(img))
         a = utils.is_similar(txt, "JOINED")
+        if a:
+            print "Lobby detected"
         return a
+
     # Grab screenshots until self.active is switched.
     # Note: this only works via multithreading (which Tkinter manages)
-    def screenshot_loop(self):
-        while self.active:
-            if self.counter == 0:
-                print "Capturing kill feed!"
-            self.counter += 1
-            im = ImageGrab.grab(bbox=BBOX["FEED"])
-            # Convert to numpy array (to play nice with multithreading?)
-            I = np.asarray(im)
-            # Truncate to 2 decimal places
-            cur_t = '%.2f' % (time.time() - self.start_t)
-            self.captures.append((I, cur_t))
+    def capture_loop(self):
+        while True:
+            if self.active:
+                if self.counter == 0:
+                    print "Capturing kill feed!"
+                self.counter += 1
+                im = ImageGrab.grab(bbox=BBOX["FEED"])
+                # Convert to numpy array (to play nice with multithreading?)
+                I = np.asarray(im)
+                # Truncate to 2 decimal places
+                cur_t = '%.2f' % (time.time() - self.start_t)
+                self.captures.append((I, cur_t))
 
-            # Loop every fixed # of seconds
-            time.sleep(self.capture_interval)
-        print "Kill feed capture complete!"
+                # Loop every fixed # of seconds
+                time.sleep(self.capture_interval)
+
     # Checks the state of the session
-    def state_listener():
-        while self.listen:
-            print "..."
-            in_lobby = self.check_for_lobby()
+    def state_listener(self):
+        while True:
+            if self.listen:
+                print "..."
+                in_lobby = self.check_for_lobby()
+                # TODO in_game = self.check_for_lobby() ## Maybe? Maybe not needed
+                print "in lobby:", in_lobby
+                print "active:", self.active
+                print "ready:", self.ready
+                print "..."
+                if in_lobby and not self.active:
+                    print "Ready for a game!"
+                    self.ready = True
+                elif self.ready and not in_lobby:
+                    self.active = True
+                    self.ready = False
+                    print "Game has begun!"
+                elif not in_lobby and self.active and not self.ready:
+                    print "Game is still in progress!"
+                elif in_lobby and self.active:
+                    print "Game has ended!"
+                    self.stop_and_process()
 
-            if not (in_lobby and self.active and self.ready):
-                print "Waiting for lobby..."
-            elif in_lobby and not self.active:
-                print "Ready for a game!"
-                self.ready = True
-            if self.ready and not in_lobby:
-                self.active = True
-                self.ready = False
-                print "Game has begun!"
-            if not in_lobby and self.active and not self.ready:
-                print "Game is still in progress!"
-            if in_lobby and self.active:
-                print "Game has ended!"
-                # "Pause" threads during image processing
-                self.active = False
-                self.listen = False
-                events = self.process_images()
-                self.export_csv(events)
-                self.reset() # This turns listening back on
-
-            time.sleep(self.capture_interval * 4)
-        print "Done listening for now!"
+                time.sleep(self.capture_interval * self.listen_interval)
     # Export events to csv
     def export_csv(self, events):
         csv_f_name = self.OUT_PATH + self.OUTPUT_NAME + ".csv"
@@ -170,27 +174,31 @@ class Session:
         self.counter = 0
         self.captures = []
         self.ready = False
-        self.game_in_progress = False
-        self.listen = True
         self.active = False
         # Make a random file name
         hash = hashlib.sha1()
         hash.update(str(time.time()))
-        self.OUTPUT_NAME = hash.hexdigest()[:10]
+        self.OUTPUT_NAME = hash.hexdigest()[:16]
         logging.basicConfig(filename=self.LOG_PATH + self.OUTPUT_NAME + '.log', level=logging.DEBUG)
         utils.ALIVE = []
         utils.DEAD = []
         print "Ready for capture of new game!"
+        self.listen = True
 
     # Start capturing
     # TODO Make this dynamic so the user only has to press it once! (i.e. 'press this in first lobby; BGOCRLG will detect new games')
     def start(self):
-        main = threading.Thread(target=screenshot_loop)
-        listener = threading.Thread(target=state_listener)
+        main = threading.Thread(target=self.capture_loop)
+        listener = threading.Thread(target=self.state_listener)
+        main.setDaemon(True)
+        listener.setDaemon(True)
         main.start()
         listener.start()
 
-    def stop(self):
+
+
+    def stop_and_process(self):
+        self.listen = False
         self.active = False
         events = self.process_images()
         self.export_csv(events)
@@ -221,5 +229,9 @@ if __name__ == "__main__":
 
     print "Resolution:", width, height
 
-    Session()
-    check_new_game()
+    s = Session()
+    s.start()
+
+    # TODO Give user ability to end with q
+    while True:
+        pass
