@@ -84,7 +84,7 @@ def resolve_name(p_name, threshold=0.6, dead=False):
     # Check results
     if len(results) > 1:
         logging.error(
-            "More than 1 possible name resolution (defaulting to first for now):",
+            "More than 1 possible name resolution (defaulting to first for now): "
             + name + ", " + str(results))
         return results[0]
     elif len(results) == 0:

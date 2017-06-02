@@ -164,8 +164,8 @@ class Session:
                 elif self.ready and not in_lobby:
                     self.active = True
                     self.ready = False
-                    print "Capturing game #" + str(self.games_counter)
-                    logging.debug("Capturing game #" + str(self.games_counter))
+                    print "Capturing game #" + str(self.games_counter + 1)
+                    logging.debug("Capturing game #" + str(self.games_counter + 1))
                 # Game is still in progress
                 elif not in_lobby and self.active and not self.ready:
                     pass
@@ -237,7 +237,7 @@ class Session:
         OCR magic. Resultant text is then parsed, filtered, and exported to a
         CSV file of (mostly) unique events.
         '''
-        print "Game " + str(self.games_counter) + " has ended!"
+        print "Game " + str(self.games_counter + 1) + " has ended!"
         self.listen = False
         self.active = False
 
