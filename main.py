@@ -35,7 +35,6 @@ class Session:
     processing = False
     OUT_PATH = "outputs/"
     LOG_PATH = "logs/"
-    counter = 0
 
     def __init__(self, capture_interval=2.5, listen_interval=4):
         '''Start a capture session with a random file name'''
@@ -61,10 +60,10 @@ class Session:
         print "=" * 50
 
     def process_images(self, images_list=None):
+        '''Process all images in the captures buffer'''
         if images_list == None:
             images_list = self.captures
         self.processing = True
-        '''Process all images in the captures buffer'''
         # Get number of cores
         cores = multiprocessing.cpu_count()
         if not cores:
@@ -121,7 +120,11 @@ class Session:
 
     def check_for_lobby(self):
         img = ImageGrab.grab(bbox=BBOX["LOBBY"])
-        txt = image_to_string(utils.scale_image(img))
+        if img:
+            txt = image_to_string(utils.scale_image(img))
+        else:
+            logging.error("Image capture failed...")
+            return False
         a = utils.is_similar(txt, "JOINED")
         if a:
             logging.debug("Lobby detected")
@@ -183,7 +186,7 @@ class Session:
         csv_f_name = self.OUT_PATH + self.OUTPUT_NAME + ".csv"
         log_f_name = self.LOG_PATH + self.OUTPUT_NAME + ".log"
 
-        if len(self.captures) > 0 and len(events) > 0:
+        if len(events) > 0:
             print "Results =>", csv_f_name
             print "Debug logs =>", log_f_name
             with open(csv_f_name, 'wb') as f:
@@ -200,6 +203,7 @@ class Session:
         self.ready = False
         self.active = False
         self.processing = False
+        self.num_events = 0
         # Make a new random file name
         hash = hashlib.sha1()
         hash.update(str(time.time()))
@@ -229,7 +233,7 @@ class Session:
         listener.start()
         print "Waiting for game to start..."
 
-    def stop_and_process(self, session_end=False, process_delayed=False):
+    def stop_and_process(self, session_end=False):
         ''' Stop capturing and listening and process images.
 
         Capture and listener threads are spinlocked while Tesseract works its
@@ -294,7 +298,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         if not s.processing:
             if args.delay:
-                s.stop_and_process(session_end=True, process_delayed=True)
+                s.stop_and_process(session_end=True)
             else:
                 s.stop_and_process(session_end=True)
             sys.exit()
