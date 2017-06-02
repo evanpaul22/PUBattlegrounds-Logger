@@ -251,7 +251,7 @@ class Session:
                         self.export_csv(events)
                         self.reset(listen=False)
                 else:
-                    print "Nothing to process."dw
+                    print "Nothing to process."
 
         self.reset()
 
