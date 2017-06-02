@@ -243,7 +243,7 @@ class Session:
             events = self.process_images()
             self.export_csv(events)
         else:
-            self.delayed_captures[self.games_counter] = self.captures
+            self.delayed_captures.append(self.captures)
             if session_end:
                 if len(self.delayed_captures) > 0:
                     for games in self.delayed_captures:
@@ -251,7 +251,7 @@ class Session:
                         self.export_csv(events)
                         self.reset(listen=False)
                 else:
-                    print "Nothing to process."
+                    print "Nothing to process."dw
 
         self.reset()
 
