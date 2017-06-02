@@ -159,7 +159,7 @@ class Session:
                     logging.debug("Ready for a game")
                     print "Currently waiting in lobby, game capture to begin shortly"
                     self.ready = True
-                    wait_t = utils.get_lobby_countdown()
+                    wait_t = utils.get_lobby_countdown(BBOX["MATCH_TIMER"])
                     time.sleep(wait_t)
                 elif self.ready and not in_lobby:
                     self.active = True
@@ -210,7 +210,6 @@ class Session:
         utils.DEAD = []
         if listen:
             logging.debug("Ready for capture of new game!")
-        else:
             self.games_counter += 1
         self.listen = listen
 
@@ -261,15 +260,10 @@ class Session:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # For slower computers (like mine): use this flag to process at the end of a session
-    # rather than at the end of each game.
+    # rather than at the end of each game. It will take a long time, but it's better than
+    # causing frame drops in the next game
     parser.add_argument('--delay-processing', dest="delay", action='store_true')
     args = parser.parse_args()
-
-    # TODO Fill this in for all supported resolutions
-    RES_MAP = {
-        (1920, 1080): {"FEED": (0, 725, 550, 930), "LOBBY": (1817, 30, 1890, 70)},
-        (1440, 900): {"FEED": (30, 1200, 850, 1450), "LOBBY": (2727, 140, 2840, 200)},
-    }
 
     # Simple way to get screen dimensions
     root = Tk()
@@ -278,25 +272,26 @@ if __name__ == "__main__":
     root.destroy()
 
     # Just to be safe; though if RES_MAP is fully updated this shouldn't happen
-    if not (width, height) in RES_MAP:
+    if not (width, height) in utils.RES_MAP:
         print "Unsupported resolution, defaulting to 1920x1080"
         width = 1920
         height = 1080
 
     # Get image boundary boxes from resolution map
-    BBOX = RES_MAP[(width, height)]
+    BBOX = utils.RES_MAP[(width, height)]
 
     print "Detected resolution:", str(width) + "x" + str(height)
     print "Press CTRL-C to end session and process any remaining images"
     s = Session()
     s.start()
 
+    # TODO: Allow user inputs here to do things such as save a session early
+    # without quitting the entire application.
     try:
         while True:
             pass
     # Catch CTRL-C and finish processing any images in the buffer
     except KeyboardInterrupt:
-        # REVIEW What happens if I CTRL-C during image processing?
         if not s.processing:
             if args.delay:
                 s.stop_and_process(session_end=True, process_delayed=True)

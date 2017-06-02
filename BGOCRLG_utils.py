@@ -18,16 +18,29 @@ WEAPONS = ["punch", "Crowbar", "Machete", "Pan", "Sickle",
            "P1911", "P92", "R1895",
            "Frag Grenade", "Molotov Cocktail",
            "Crossbow"]
+# TODO Fill this in for all supported resolutions
+RES_MAP = {
+    (1920, 1080):{
+        "FEED": (0, 725, 550, 930),
+        "LOBBY": (1817, 30, 1890, 70),
+        "MATCH_TIMER": (940, 710, 990, 760)
+    },
+    (1440, 900): {
+        "FEED": (30, 1200, 850, 1450),
+        "LOBBY": (2727, 140, 2840, 200),
+        "MATCH_TIMER": (1410, 1150, 1465, 1240)
+    },
 
+}
 
-def get_lobby_countdown():
+def get_lobby_countdown(boundary_box):
     '''Attempt to take a screen shot of the lobby countdown timer'''
-    img = ImageGrab.grab(bbox=(940, 710, 990, 760))
+    img = ImageGrab.grab(bbox=boundary_box)
     # TODO Move this to RES_MAP
     txt = image_to_string(scale_image(img))
     if txt.isdigit():
-        a = int(txt)
-        return a
+        countdown = int(txt)
+        return countdown
     else:
         logging.warning("Lobby countdown not found (perhaps it hasn't loaded yet)")
         # REVIEW Current (imperfect) logic relies on this returning some number
@@ -57,7 +70,8 @@ def resolve_name(p_name, threshold=0.6, dead=False):
     # Check targetted list for player name
     name = re.sub('[\[\]\.<>?/;:,\"\'\\()+=|~`]', '',
                   p_name)  # Remove dumb characters
-    logging.debug("Before: " + p_name + "; After: " + name)
+    if name == '':
+        logging.warning("Before: " + p_name + "\nAfter: " + name)
     # Remove "##*left" string if it exists
     name = re.sub('(-)?([0-9])?[0-9](.)?[Il]eft$', '', name)
     # name = re.sub('(\wkilled$)|(\wwith$)|(\wknocked$)|')
@@ -92,7 +106,8 @@ def resolve_name(p_name, threshold=0.6, dead=False):
         target_list.append(name)
         return name
     else:
-        logging.debug("Resolving " + name + " to " + results[0])
+        if p_name != results[0]:
+            logging.debug("Resolving " + name + " to " + results[0])
         return results[0]
 
 
@@ -247,7 +262,6 @@ def process_event(event):
                 return {
                     "villain": villain,
                     "victim": victim,
-                    "weapon": weapon,
                     "type": e_type
                 }
 
