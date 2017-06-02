@@ -210,6 +210,8 @@ class Session:
         utils.DEAD = []
         if listen:
             logging.debug("Ready for capture of new game!")
+        else:
+            self.games_counter += 1
         self.listen = listen
 
     def start(self):
