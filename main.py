@@ -11,7 +11,7 @@ import hashlib
 import csv
 import logging
 from unidecode import unidecode
-import BGOCRLG_utils as utils
+import BGOCRLG_utils as b_utils
 import threading
 import argparse
 reload(sys)
@@ -75,7 +75,7 @@ class Session:
         # Parallelize then rejoin
         pool = multiprocessing.Pool(threads)
 
-        results = pool.map(utils.process_image, images_list)
+        results = pool.map(b_utils.process_image, images_list)
         pool.close()
         pool.join()
 
@@ -103,7 +103,7 @@ class Session:
             events = [q for p, q in enumerate(events) if p not in bad_indices]
             # Process each event within the feed photo
             for event in events:
-                feed_res = utils.process_event(event)
+                feed_res = b_utils.process_event(event)
                 # Bad strings are thrown away
                 if feed_res:
                     feed_res["time"] = t
@@ -112,7 +112,7 @@ class Session:
         if len(images_list) == 0:
             print "Allow program to capture images before stopping!"
         else:
-            unique_events_list = utils.filter_duplicates(feed_results)
+            unique_events_list = b_utils.filter_duplicates(feed_results)
             self.num_events = len(unique_events_list)
             self.report()
             return unique_events_list
@@ -121,11 +121,11 @@ class Session:
     def check_for_lobby(self):
         img = ImageGrab.grab(bbox=BBOX["LOBBY"])
         if img:
-            txt = image_to_string(utils.scale_image(img))
+            txt = image_to_string(b_utils.scale_image(img))
         else:
             logging.error("Image capture failed...")
             return False
-        a = utils.is_similar(txt, "JOINED")
+        a = b_utils.is_similar(txt, "JOINED")
         if a:
             logging.debug("Lobby detected")
         return a
@@ -162,7 +162,7 @@ class Session:
                     logging.debug("Ready for a game")
                     print "Currently waiting in lobby, game capture to begin shortly"
                     self.ready = True
-                    wait_t = utils.get_lobby_countdown(BBOX["MATCH_TIMER"])
+                    wait_t = b_utils.get_lobby_countdown(BBOX["MATCH_TIMER"])
                     time.sleep(wait_t)
                 elif self.ready and not in_lobby:
                     self.active = True
@@ -210,8 +210,8 @@ class Session:
         self.OUTPUT_NAME = hash.hexdigest()[:16]
         logging.basicConfig(filename=self.LOG_PATH +
                             self.OUTPUT_NAME + '.log', level=logging.DEBUG)
-        utils.ALIVE = []
-        utils.DEAD = []
+        b_utils.ALIVE = []
+        b_utils.DEAD = []
         if listen:
             logging.debug("Ready for capture of new game!")
             self.games_counter += 1
@@ -276,13 +276,13 @@ if __name__ == "__main__":
     root.destroy()
 
     # Just to be safe; though if RES_MAP is fully updated this shouldn't happen
-    if not (width, height) in utils.RES_MAP:
+    if not (width, height) in b_utils.RES_MAP:
         print "Unsupported resolution, defaulting to 1920x1080"
         width = 1920
         height = 1080
 
     # Get image boundary boxes from resolution map
-    BBOX = utils.RES_MAP[(width, height)]
+    BBOX = b_utils.RES_MAP[(width, height)]
 
     print "Detected resolution:", str(width) + "x" + str(height)
     print "Press CTRL-C to end session and process any remaining images"
