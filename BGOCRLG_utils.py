@@ -52,7 +52,7 @@ def is_similar(a, b, threshold=0.7, echo=False):
     '''Return the similarity score [0, 1] between two strings'''
     rate = SequenceMatcher(None, a, b).ratio()
     if echo:
-        print a, b, rate
+        print(a, b, rate)
     if rate >= threshold:
         return True
     else:

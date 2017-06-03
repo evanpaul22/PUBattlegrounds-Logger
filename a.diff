@@ -1,0 +1,11 @@
+--- BGOCRLG_utils.py	(original)
++++ BGOCRLG_utils.py	(refactored)
+@@ -52,7 +52,7 @@
+     '''Return the similarity score [0, 1] between two strings'''
+     rate = SequenceMatcher(None, a, b).ratio()
+     if echo:
+-        print a, b, rate
++        print(a, b, rate)
+     if rate >= threshold:
+         return True
+     else:

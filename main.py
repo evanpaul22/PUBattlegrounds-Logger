@@ -3,7 +3,7 @@ import sys
 from PIL import Image
 from PIL import ImageGrab
 from pytesseract import image_to_string
-from Tkinter import Tk, Label, Button
+from tkinter import Tk, Label, Button
 import time
 import multiprocessing
 import numpy as np
@@ -14,8 +14,8 @@ from unidecode import unidecode
 import BGOCRLG_utils as b_utils
 import threading
 import argparse
-reload(sys)
-sys.setdefaultencoding('utf8')
+# reload(sys)
+# sys.setdefaultencoding('utf8')
 
 
 class Session:
@@ -40,7 +40,7 @@ class Session:
         '''Start a capture session with a random file name'''
         # Make a random file name
         hash = hashlib.sha1()
-        hash.update(str(time.time()))
+        hash.update(str(time.time()).encode('utf-8'))
         self.OUTPUT_NAME = hash.hexdigest()[:10]
 
         logging.basicConfig(filename=self.LOG_PATH +
@@ -52,12 +52,12 @@ class Session:
 
     def report(self):
         '''Report results of session'''
-        print "=" * 50
-        print "Finished gathering data sucessfully"
-        print "Capture time:", time.time() - self.start_t
-        print "Total screenshots:", len(self.captures)
-        print "# of unique events:", self.num_events
-        print "=" * 50
+        print("=" * 50)
+        print("Finished gathering data sucessfully")
+        print("Capture time:", time.time() - self.start_t)
+        print("Total screenshots:", len(self.captures))
+        print("# of unique events:", self.num_events)
+        print("=" * 50)
 
     def process_images(self, images_list=None):
         '''Process all images in the captures buffer'''
@@ -71,7 +71,7 @@ class Session:
         # REVIEW Test performance at different thread counts
         threads = cores * 2
 
-        print "Processing", len(images_list), "images with", threads, "threads"
+        print("Processing", len(images_list), "images with", threads, "threads")
         # Parallelize then rejoin
         pool = multiprocessing.Pool(threads)
 
@@ -80,8 +80,13 @@ class Session:
         pool.join()
 
         feed_results = []
+        if not results:
+            print("No images were processed successfully!")
+            return False
         # Each event is based on one image
         for events in results:
+            if not events:
+                print("Error: event is None?")
             if len(events[0]) == 0:
                 logging.warning("Trash string")
                 continue
@@ -96,7 +101,7 @@ class Session:
                     bad_indices.append(j)
                 else:
                     try:
-                        events[j] = unidecode(u'' + events[j])
+                        events[j] = unidecode('' + events[j])
                     except UnicodeDecodeError:
                         bad_indices.append(j)
             # Remove bad events i.e. muddy text that isn't large enough
@@ -110,7 +115,7 @@ class Session:
                     feed_results.append(feed_res)
 
         if len(images_list) == 0:
-            print "Allow program to capture images before stopping!"
+            print("Allow program to capture images before stopping!")
         else:
             unique_events_list = b_utils.filter_duplicates(feed_results)
             self.num_events = len(unique_events_list)
@@ -160,14 +165,14 @@ class Session:
 
                 if in_lobby and not self.active:
                     logging.debug("Ready for a game")
-                    print "Currently waiting in lobby, game capture to begin shortly"
+                    print("Currently waiting in lobby, game capture to begin shortly")
                     self.ready = True
                     wait_t = b_utils.get_lobby_countdown(BBOX["MATCH_TIMER"])
                     time.sleep(wait_t)
                 elif self.ready and not in_lobby:
                     self.active = True
                     self.ready = False
-                    print "Capturing game #" + str(self.games_counter + 1)
+                    print("Capturing game #" + str(self.games_counter + 1))
                     logging.debug("Capturing game #" + str(self.games_counter + 1))
                 # Game is still in progress
                 elif not in_lobby and self.active and not self.ready:
@@ -183,19 +188,22 @@ class Session:
         .CSV files ==> outputs/[session-id].csv
         Debug logs ==> logs/[session-id].log
         '''
+        if events is not list:
+            print("What are you doing don't do that")
+            return
         csv_f_name = self.OUT_PATH + self.OUTPUT_NAME + ".csv"
         log_f_name = self.LOG_PATH + self.OUTPUT_NAME + ".log"
 
         if len(events) > 0:
-            print "Results =>", csv_f_name
-            print "Debug logs =>", log_f_name
-            with open(csv_f_name, 'wb') as f:
-                w = csv.DictWriter(f, events[0].keys())
+            print("Results =>", csv_f_name)
+            print("Debug logs =>", log_f_name)
+            with open(csv_f_name, 'w') as f:
+                w = csv.DictWriter(f, list(events[0].keys()))
                 w.writeheader()
                 for e in events:
                     w.writerow(e)
         else:
-            print "Nothing to export!"
+            print("Nothing to export!")
 
     def reset(self, listen=True):
         '''Reset state variables to prepare for a new game'''
@@ -206,7 +214,7 @@ class Session:
         self.num_events = 0
         # Make a new random file name
         hash = hashlib.sha1()
-        hash.update(str(time.time()))
+        hash.update(str(time.time()).encode('utf-8'))
         self.OUTPUT_NAME = hash.hexdigest()[:16]
         logging.basicConfig(filename=self.LOG_PATH +
                             self.OUTPUT_NAME + '.log', level=logging.DEBUG)
@@ -231,7 +239,7 @@ class Session:
         listener.setDaemon(True)
         capture.start()
         listener.start()
-        print "Waiting for game to start..."
+        print("Waiting for game to start...")
 
     def stop_and_process(self, session_end=False):
         ''' Stop capturing and listening and process images.
@@ -240,23 +248,29 @@ class Session:
         OCR magic. Resultant text is then parsed, filtered, and exported to a
         CSV file of (mostly) unique events.
         '''
-        print "Game " + str(self.games_counter + 1) + " has ended!"
+        print("Game " + str(self.games_counter + 1) + " has ended!")
         self.listen = False
         self.active = False
 
         if not args.delay:
             events = self.process_images()
-            self.export_csv(events)
+            if events:
+                self.export_csv(events)
+            else:
+                print("Nothing to export")
         else:
             self.delayed_captures.append(self.captures)
             if session_end:
                 if len(self.delayed_captures) > 0:
                     for games in self.delayed_captures:
                         events = self.process_images(images_list=games)
-                        self.export_csv(events)
+                        if events:
+                            self.export_csv(events)
+                        else:
+                            print("Nothing to export")
                         self.reset(listen=False)
                 else:
-                    print "Nothing to process."
+                    print("Nothing to process.")
 
         self.reset()
 
@@ -277,15 +291,15 @@ if __name__ == "__main__":
 
     # Just to be safe; though if RES_MAP is fully updated this shouldn't happen
     if not (width, height) in b_utils.RES_MAP:
-        print "Unsupported resolution, defaulting to 1920x1080"
+        print("Unsupported resolution, defaulting to 1920x1080")
         width = 1920
         height = 1080
 
     # Get image boundary boxes from resolution map
     BBOX = b_utils.RES_MAP[(width, height)]
 
-    print "Detected resolution:", str(width) + "x" + str(height)
-    print "Press CTRL-C to end session and process any remaining images"
+    print("Detected resolution:", str(width) + "x" + str(height))
+    print("Press CTRL-C to end session and process any remaining images")
     s = Session()
     s.start()
 
@@ -303,4 +317,4 @@ if __name__ == "__main__":
                 s.stop_and_process(session_end=True)
             sys.exit()
         else:
-            print "Please wait for images to finish processing!"
+            print("Please wait for images to finish processing!")
