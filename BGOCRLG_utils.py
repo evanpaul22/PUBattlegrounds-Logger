@@ -388,5 +388,9 @@ def process_image(im):
     '''Send an image to Tesseract and receive text'''
     img = Image.fromarray(np.uint8(im[0]))
     img = scale_image(img)
-    txt = image_to_string(img)
-    return (txt, im[1])
+    try:
+        txt = image_to_string(img)
+        return txt, im[1]
+    except UnicodeDecodeError:
+        logging.error("UnicodeDecodeError!")
+        return None, None

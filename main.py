@@ -71,7 +71,12 @@ class Session:
         # REVIEW Test performance at different thread counts
         threads = cores * 2
 
+        if len(images_list) == 0:
+            print("No images to process!")
+            return False
         print("Processing", len(images_list), "images with", threads, "threads")
+
+
         # Parallelize then rejoin
         pool = multiprocessing.Pool(threads)
 
@@ -86,8 +91,8 @@ class Session:
         # Each event is based on one image
         for events in results:
             if not events:
-                print("Error: event is None?")
-            if len(events[0]) == 0:
+                print("Event in nonempty results set is None")
+            elif events[0] is None or len(events[0]) == 0:
                 logging.warning("Trash string")
                 continue
             t = events[1]
@@ -164,8 +169,7 @@ class Session:
                 logging.debug("...")
 
                 if in_lobby and not self.active:
-                    logging.debug("Ready for a game")
-                    print("Currently waiting in lobby, game capture to begin shortly")
+                    logging.debug("Currently waiting in lobby, game capture to begin shortly")
                     self.ready = True
                     wait_t = b_utils.get_lobby_countdown(BBOX["MATCH_TIMER"])
                     time.sleep(wait_t)
@@ -189,7 +193,8 @@ class Session:
         Debug logs ==> logs/[session-id].log
         '''
         if events is not list:
-            print("What are you doing don't do that")
+            logging.error("Argument is of wrong type in export_csv")
+            logging.error("=>" + type(events) + ":" + str(events))
             return
         csv_f_name = self.OUT_PATH + self.OUTPUT_NAME + ".csv"
         log_f_name = self.LOG_PATH + self.OUTPUT_NAME + ".log"
@@ -257,7 +262,7 @@ class Session:
             if events:
                 self.export_csv(events)
             else:
-                print("Nothing to export")
+                print("Nothing to export.")
         else:
             self.delayed_captures.append(self.captures)
             if session_end:
@@ -267,7 +272,7 @@ class Session:
                         if events:
                             self.export_csv(events)
                         else:
-                            print("Nothing to export")
+                            print("Nothing to export.")
                         self.reset(listen=False)
                 else:
                     print("Nothing to process.")
